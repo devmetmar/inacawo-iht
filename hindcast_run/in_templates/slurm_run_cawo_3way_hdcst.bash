@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=HDCAST
-#SBATCH --job-name=run_hdcst        #passed by script
+#SBATCH --job-name=HDCST-FT        #passed by script
 #SBATCH --nodes=88                #passed by script
 #SBATCH --ntasks-per-node=96
 #SBATCH --exclusive
@@ -14,6 +14,9 @@ set -x
 
 date
 
+source ~/.bashrc
+source $CONDA_BASE/etc/profile.d/conda.sh
+source $COAWST_ENV
 source /etc/profile.d/modules.sh
 module purge
 module load compiler/2022.0.2 mpi/2021.5.1
