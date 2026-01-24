@@ -10,7 +10,8 @@
 #SBATCH --output=log/log_ocnGcawo_%A_%a.out
 #SBATCH --error=log/log_ocnGcawo_%A_%a.err
 
-source /home/cawohdcst_ft2/opt/miniforge3/etc/profile.d/conda.sh
+source ~/.bashrc
+source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate loenv
 
 ########################################

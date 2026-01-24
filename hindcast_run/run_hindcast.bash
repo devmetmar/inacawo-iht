@@ -1,18 +1,23 @@
 #!/bin/bash
 
-source /home/cawohdcst_ft2/hindcast_scripts/coawst.bash_env_intel.source_oneapi
+source ~/.bashrc
+source $CONDA_BASE/etc/profile.d/conda.sh
+source $COAWST_ENV
 
 start_date="1995-1-1"
 end_date="1995-1-5"
+
+CAWO_HINDCAST_OUTPUT=$CAWO_OUTPUT
+CAWO_HINDCAST_RUN=$CAWO_HINDCAST_RUN
 
 current_date=$start_date
 while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
     folder_date=$(date -d "$current_date" +%Y%m%d)
     
     # Enter the run folder
-    cd /scratch/cawohdcst_ft2/data/cawo_hindcast_run/f"$folder_date"/
+    cd $CAWO_HINDCAST_RUN/f"$folder_date"/
     # Create output directory
-    mkdir /scratch/cawohdcst_ft2/data/cawo_hindcast_outputs/f"$folder_date"/
+    mkdir $CAWO_HINDCAST_OUTPUT/f"$folder_date"/
 
     echo "Submitting job for $folder_date ..."
     # Submit slurm job and capture job ID

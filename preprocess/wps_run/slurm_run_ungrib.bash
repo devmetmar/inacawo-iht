@@ -5,7 +5,7 @@
 #SBATCH --time=200:00:00
 #SBATCH --output=run_ungrib_loop_%j.log
 
-source /home/cawohdcst_ft2/hindcast_scripts/coawst.bash_env_intel.source_oneapi
+source $COAWST_ENV
 
 # Loop range (format: YYYYMMDD)
 START_DATE=19950101

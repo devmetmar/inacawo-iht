@@ -11,7 +11,7 @@
 set -x
 date
 
-source /home/cawohdcst_ft2/hindcast_scripts/coawst.bash_env_intel.source_oneapi
+source $COAWST_ENV
 
 START_DATE=19950101
 END_DATE=19950105

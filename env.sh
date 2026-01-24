@@ -5,11 +5,13 @@
 export WORK_BASE='/home/cawohdcst_ft2/tyo'
 export CAWO_HINDCAST_BASE='/scratch/cawohdcst_ft2/tyo/cawo_hindcast'
 export MODEL_BASE='/home/cawohdcst_ft2/models'
+export CONDA_BASE='/home/cawohdcst_ft2/opt/miniforge3'
 #
 # ----------------
 # Lib dependencies
 # ----------------
 export LIBDEP='/home/cawohdcst_ft2/apps/cawo_depends/intel_2021.5.0/build/lib'
+export COAWST_ENV='/home/cawohdcst_ft2/hindcast_scripts/coawst.bash_env_intel.source_oneapi'
 # --------------------
 # Global Data Download
 # --------------------

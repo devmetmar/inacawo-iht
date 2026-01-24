@@ -7,7 +7,7 @@
 #SBATCH --output=run_swan_bc_%j.log
 
 source ~/.bashrc
-source /home/cawohdcst_ft2/opt/miniforge3/etc/profile.d/conda.sh
+source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate loenv
 
 # Run the Python scrip

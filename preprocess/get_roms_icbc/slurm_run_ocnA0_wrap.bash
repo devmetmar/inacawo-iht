@@ -8,7 +8,7 @@
 #SBATCH --output=log/log_ocnA0_%j.out
 
 source ~/.bashrc
-source /home/cawohdcst_ft2/opt/miniforge3/etc/profile.d/conda.sh
+source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate loenv
 
 # =========================
