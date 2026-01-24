@@ -15,9 +15,10 @@ while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
     folder_date=$(date -d "$current_date" +%Y%m%d)
     
     # Enter the run folder
-    cd $CAWO_HINDCAST_RUN/f"$folder_date"/
+    cd "$CAWO_HINDCAST_RUN/f$folder_date/"
+    echo "Entering $CAWO_HINDCAST_RUN/f$folder_date/"
     # Create output directory
-    mkdir $CAWO_HINDCAST_OUTPUT/f"$folder_date"/
+    mkdir -p $CAWO_HINDCAST_OUTPUT/f"$folder_date"/
 
     echo "Submitting job for $folder_date ..."
     # Submit slurm job and capture job ID

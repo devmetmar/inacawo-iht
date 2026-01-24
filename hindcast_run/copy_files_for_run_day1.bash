@@ -74,13 +74,13 @@ while [[ "$current_date" -le "$date_end" ]]; do
         copy_file "$WPS_DIR/snow_rat_fn.txt" .
 
         # ---- Static/common files ----
-        copy_file "$IN_TEMPLATES/htr_iofields_list.txt" "$CAWO_HINDCAST_RUN/htr_iofields_list.txt"
-        copy_file "$IN_TEMPLATES/slurm_run_cawo_3way_hdcst.bash" "$CAWO_HINDCAST_RUN"
-        copy_file "$SWAN_STATIC/swan_bathy_v255.bot" "$CAWO_HINDCAST_RUN"
-        copy_file "$SWAN_STATIC/swan_coord_v255.grd" "$CAWO_HINDCAST_RUN"
-        copy_file "$VARINFO/varinfo.dat" "$CAWO_HINDCAST_RUN"
-        copy_file "$GRID_SCRIP/scrip_mar2023.nc" "$CAWO_HINDCAST_RUN"
-        copy_file "$IN_TEMPLATES/coupling_cawo.in.template" "$CAWO_HINDCAST_RUN/coupling_cawo.in"
+        copy_file "$IN_TEMPLATES/htr_iofields_list.txt" .
+        copy_file "$IN_TEMPLATES/slurm_run_cawo_3way_hdcst.bash" .
+        copy_file "$SWAN_STATIC/swan_bathy_v255.bot" .
+        copy_file "$SWAN_STATIC/swan_coord_v255.grd" .
+        copy_file "$VARINFO/varinfo.dat" .
+        copy_file "$GRID_SCRIP/scrip_mar2023.nc" .
+        copy_file "$IN_TEMPLATES/coupling_cawo.in.template" "coupling_cawo.in"
 
         cd ..
     else
