@@ -20,10 +20,10 @@ while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
     # Create output directory
     mkdir -p $CAWO_HINDCAST_OUTPUT/f"$folder_date"/
 
-    echo "Submitting job for $folder_date ..."
     # Submit slurm job and capture job ID
     jobid=$(sbatch slurm_run_cawo_3way_hdcst.bash | awk '{print $4}')
 
+    echo "Job submitted for $folder_date. Jobid: $jobid"
     log_file=log_run_${jobid}.out
 
     # Wait until DONE appears in the log
