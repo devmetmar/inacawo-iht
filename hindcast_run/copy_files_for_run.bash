@@ -5,14 +5,13 @@
 set -euo pipefail
 shopt -s nullglob
 
-RUNS_DIR="/scratch/cawohdcst_ft2/data/cawo_hindcast_run"
-WPS_BASE="/scratch/cawohdcst_ft2/data/wps_run"
-SWAN_BCS="/scratch/cawohdcst_ft2/data/swan_bcs"
-MODEL_DIR=~/models/cawo_3way_swell_mods_no_ramp_tides
-TEST_DIR="/scratch/cawohdcst_ft2/data/cawo_hindcast_run/test_runs/"
+RUNS_DIR=$CAWO_HINDCAST_RUN
+WPS_BASE=$WPS_RUN_DIR
+SWAN_BCS="$CAWO_INPUT/swan_bcs"
+MODEL_DIR="$MODEL_BASE/cawo_3way_swell_mods_no_ramp_tides"
 
 # === Define date range ===
-date_start=19950101
+date_start=19950102
 date_end=19950105
 
 # --- helper functions ---
@@ -75,13 +74,13 @@ while [[ "$current_date" -le "$date_end" ]]; do
         copy_file "$WPS_DIR/snow_rat_fn.txt" .
 
         # ---- Static/common files ----
-        copy_file "in_templates/htr_iofields_list.txt" "$CAWO_HINDCAST_RUN/htr_iofields_list.txt"
-        copy_file "slurm_run_cawo_3way_hdcst.bash" "$CAWO_HINDCAST_RUN"
+        copy_file "$IN_TEMPLATES/htr_iofields_list.txt" "$CAWO_HINDCAST_RUN/htr_iofields_list.txt"
+        copy_file "$IN_TEMPLATES/slurm_run_cawo_3way_hdcst.bash" "$CAWO_HINDCAST_RUN"
         copy_file "$SWAN_STATIC/swan_bathy_v255.bot" "$CAWO_HINDCAST_RUN"
         copy_file "$SWAN_STATIC/swan_coord_v255.grd" "$CAWO_HINDCAST_RUN"
         copy_file "$VARINFO/varinfo.dat" "$CAWO_HINDCAST_RUN"
-        copy_file ../scrip_mar2023.nc $CAWO_HINDCAST_RUN
-        copy_file in_templates/coupling_cawo.in.template "$CAWO_HINDCAST_RUN/coupling_cawo.in"
+        copy_file "$GRID_SCRIP/scrip_mar2023.nc" "$CAWO_HINDCAST_RUN"
+        copy_file "$IN_TEMPLATES/coupling_cawo.in.template" "$CAWO_HINDCAST_RUN/coupling_cawo.in"
 
         cd ..
     else
