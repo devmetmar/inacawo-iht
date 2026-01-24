@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --job-name=swan_bc
+#SBATCH --ntasks=1
+#SBATCH --mem=230G
+#SBATCH --time=02:00:00
+#SBATCH --partition=HDCAST
+#SBATCH --output=run_swan_bc_%j.log
+
+source ~/.bashrc
+source /home/cawohdcst_ft2/opt/miniforge3/etc/profile.d/conda.sh
+conda activate loenv
+
+# Run the Python scrip
+python make_swan_bc.py

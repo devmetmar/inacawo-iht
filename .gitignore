@@ -1,0 +1,6 @@
+*log
+*out
+*err
+log
+__pycache__
+*pyc
