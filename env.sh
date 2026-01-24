@@ -1,7 +1,8 @@
 #!/bin/bash
 # 
+# -----------------
 # Working directory
-# 
+# -----------------
 export WORK_BASE='/home/cawohdcst_ft2/tyo'
 export CAWO_HINDCAST_BASE='/scratch/cawohdcst_ft2/tyo/cawo_hindcast'
 export MODEL_BASE='/home/cawohdcst_ft2/models'
