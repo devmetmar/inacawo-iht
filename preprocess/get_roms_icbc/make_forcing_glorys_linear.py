@@ -11,20 +11,24 @@ import os
 import xarray as xr
 import pandas as pd
 import glob
-import Ofun
-import zrfun
-import Lfun
 import numpy as np
+from utils import Ofun, zrfun, Lfun
 from scipy.spatial import cKDTree
-from scipy.interpolate import interp1d
-from scipy.interpolate import griddata
+from scipy.interpolate import interp1d, griddata
+
+# Read date argument from SLURM
+if len(sys.argv) != 2:
+    raise ValueError("Usage: python make_forcing_glorys_linear_parallel.py YYYY-MM-DD")
+
+date_str = sys.argv[1]  # e.g., '1995-01-04'
+date_fmt = date_str.replace("-", "")
 
 # grid and parameters
 grid_folder = os.environ.get("GRID_DATA")
-grdname = grid_folder + 'grid.nc'
+grdname = grid_folder + '/' + 'grid.nc'
 ds_grd = xr.open_dataset(grdname)
 print('read grd')
-df_scoord = pd.read_csv(grid_folder + 'S_COORDINATE_INFO.csv')
+df_scoord = pd.read_csv(grid_folder + '/' + 'S_COORDINATE_INFO.csv')
 theta_s = df_scoord.VALUES[0]
 theta_b = df_scoord.VALUES[1]
 tcline = df_scoord.VALUES[2]
@@ -34,25 +38,25 @@ vstretch = df_scoord.VALUES[5]
 
 # Glorys files
 glorys_folder = os.environ.get("GLORYS_BASE_DIR")
-g_list = sorted(glob.glob(glorys_folder + '*.nc'))
+g_list = sorted([os.path.join(glorys_folder, file) for file in os.listdir(glorys_folder) if file.endswith(".nc")])
+print(glorys_folder, g_list)
 
 # LO cas2k templates
-cawo_folder = os.environ.get("ROMS_FORCING")
-lo_list = sorted(glob.glob(cawo_folder + 'f1995*'))
+roms_forcing_dir = os.environ.get("ROMS_FORCING") + '/' + f'f{date_fmt}'
 
 # 
 ds_glo = xr.open_dataset(g_list[0])
 print('read glorys')
-ds_lo = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_ini.nc')
+ds_lo = xr.open_dataset(roms_forcing_dir+'/'+'ocnA0/ocean_ini.nc')
 print('read ini template')
-ds_clm = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_clm.nc')
+ds_clm = xr.open_dataset(roms_forcing_dir+'/'+'ocnA0/ocean_clm.nc')
 print('read clm template')
-ds_bry = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_bry.nc')
+ds_bry = xr.open_dataset(roms_forcing_dir+'/'+'ocnA0/ocean_bry.nc')
 print('read bry template')
 # Load Mercator mean seal level
 ds_msl = xr.open_dataset(f'{grid_folder}/mercator_msl.nc')
 print('read msl')
-os.makedirs(lo_list[0]+'/'+'ocnG', exist_ok = True)
+os.makedirs(roms_forcing_dir+'/'+'ocnG', exist_ok = True)
 
 # extrapolate
 lon, lat, z, L, M, N, X, Y = Ofun.get_coords(ds_glo)
@@ -104,8 +108,8 @@ ds_glo['vbar'] = vbar
 print('step2')
 # interpolate to ROMS format
 # get grid and S info
-G = zrfun.get_basic_info(grid_folder + 'grid.nc', only_G=True)
-S_info_dict = Lfun.csv_to_dict(grid_folder + 'S_COORDINATE_INFO.csv')
+G = zrfun.get_basic_info(grid_folder + '/' + 'grid.nc', only_G=True)
+S_info_dict = Lfun.csv_to_dict(grid_folder + '/' + 'S_COORDINATE_INFO.csv')
 S = zrfun.get_S(S_info_dict)
 #zinds = Ofun.get_zinds(G['h'], S, z)
 h = G['h']
@@ -271,7 +275,7 @@ for var in v2d_list:
 # remove geoid from mercator ssh
 ds_lo['zeta'].values = ds_lo['zeta'].values - ds_msl['zeta'].values
 
-ds_lo.to_netcdf(lo_list[0]+'/'+'ocnG/ocean_ini.nc')
+ds_lo.to_netcdf(roms_forcing_dir+'/'+'ocnG/ocean_ini.nc')
 
 # Create clm
     
@@ -282,7 +286,7 @@ for var in v3d_list:
 for var in v2d_list:
     ds_clm[var].values = ds_lo[var].values
 
-ds_clm.to_netcdf(lo_list[0]+'/'+'ocnG/ocean_clm.nc')
+ds_clm.to_netcdf(roms_forcing_dir+'/'+'ocnG/ocean_clm.nc')
 
 # Get the boundary slices and assign to the bry file
 brys = ['west','north','south','east']
@@ -353,4 +357,4 @@ for var in v2d_list:
            elif bry == 'north':
               ds_bry[var + '_' + bry].values = ds_lo[var].isel(eta_rho=-1).values
 
-ds_bry.to_netcdf(lo_list[0]+'/'+'ocnG/ocean_bry.nc')
+ds_bry.to_netcdf(roms_forcing_dir+'/'+'ocnG/ocean_bry.nc')
