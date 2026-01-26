@@ -1,10 +1,20 @@
 import cdsapi
 import os
 from datetime import datetime, timedelta
+import argparse
 
-# Define the range of dates to process
-start_date = datetime(1995, 1, 1)
-end_date = datetime(1995, 1, 5)
+parser = argparse.ArgumentParser(description="Process data in a date range")
+
+parser.add_argument("start_date", help="Start date in YYYYMMDD format")
+parser.add_argument("end_date", help="End date in YYYYMMDD format")
+
+args = parser.parse_args()
+
+start_date = datetime.strptime(args.start_date, "%Y%m%d")
+end_date = datetime.strptime(args.end_date, "%Y%m%d")
+
+print("Start:", start_date)
+print("End:", end_date)
 
 dataset = "reanalysis-era5-single-levels"
 variables = [

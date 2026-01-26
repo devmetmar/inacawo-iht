@@ -12,12 +12,20 @@ Edited by tyo
 
 import os
 from datetime import datetime, timedelta
+import argparse
 
-# Set the start date
-start_date = datetime(1995, 1, 1)
+parser = argparse.ArgumentParser(description="Process data in a date range")
 
-# Set the end date
-end_date = datetime(1995, 1, 5)
+parser.add_argument("start_date", help="Start date in YYYYMMDD format")
+parser.add_argument("end_date", help="End date in YYYYMMDD format")
+
+args = parser.parse_args()
+
+start_date = datetime.strptime(args.start_date, "%Y%m%d")
+end_date = datetime.strptime(args.end_date, "%Y%m%d")
+
+print("Start:", start_date)
+print("End:", end_date)
 
 # Define the directory prefix
 cawo_hindcast_run_dir = os.environ.get("CAWO_HINDCAST_RUN")

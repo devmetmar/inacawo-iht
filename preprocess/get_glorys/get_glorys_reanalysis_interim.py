@@ -8,10 +8,20 @@ Created on Wed Dec  6 10:39:40 2023
 import os
 import copernicusmarine
 from datetime import datetime, timedelta
+import argparse
 
-# Define the date range
-start_date = datetime(2024, 6, 9)
-end_date = datetime(2024, 6, 15)  # Adjust the end date as needed
+parser = argparse.ArgumentParser(description="Process data in a date range")
+
+parser.add_argument("start_date", help="Start date in YYYYMMDD format")
+parser.add_argument("end_date", help="End date in YYYYMMDD format")
+
+args = parser.parse_args()
+
+start_date = datetime.strptime(args.start_date, "%Y%m%d")
+end_date = datetime.strptime(args.end_date, "%Y%m%d")
+
+print("Start:", start_date)
+print("End:", end_date)
 
 # Loop through the date range
 current_date = start_date
