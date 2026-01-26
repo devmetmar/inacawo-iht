@@ -12,16 +12,10 @@ source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate loenv
 
 # =========================
-# INIT DAY (new)
-# =========================
-echo "Running initialization day"
-python driver_forcing3.py -g cawo -0 "1995.01.01" -s "new" -f ocnA0
-
-# =========================
 # DATE RANGE
 # =========================
-start_date="1995-01-02"
-end_date="1995-01-05"
+start_date="1995-01-06"
+end_date="1995-01-06"
 current_date="$start_date"
 MAX_PARALLEL=16   # limit parallel processes
 job_count=0
