@@ -11,4 +11,4 @@ source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate loenv
 
 # Run the Python scrip
-python make_swan_bc.py
+python make_swan_bc.py 19950106 19950106

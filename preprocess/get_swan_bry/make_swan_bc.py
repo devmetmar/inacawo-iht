@@ -68,13 +68,25 @@ def process_one_day(start_date):
     print(f"✅ Processed {date_folder}")
 
 if __name__ == "__main__":
-    start_str = "1995-01-01"
-    end_str = "1995-01-06"
-    start_date = datetime.strptime(start_str, "%Y-%m-%d")
-    end_date = datetime.strptime(end_str, "%Y-%m-%d")
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Process data in a date range")
+
+    parser.add_argument("start_date", help="Start date in YYYYMMDD format")
+    parser.add_argument("end_date", help="End date in YYYYMMDD format")
+
+    args = parser.parse_args()
+
+    start_date = datetime.strptime(args.start_date, "%Y%m%d")
+    end_date = datetime.strptime(args.end_date, "%Y%m%d")
+
+    print(f"start_date {start_date}")
+    print(f"end_date {end_date}")
 
     curr = start_date
-    while curr < end_date:
+    while curr <= end_date:
+        print(f"Processing {curr} ...")
         process_one_day(curr)
         curr += timedelta(days=1)
 
