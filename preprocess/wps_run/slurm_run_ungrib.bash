@@ -3,13 +3,13 @@
 #SBATCH --job-name=run_ungrib_loop
 #SBATCH --ntasks=1
 #SBATCH --time=200:00:00
-#SBATCH --output=run_ungrib_loop_%j.log
+#SBATCH --output=log/run_ungrib_loop_%j.log
 
 source $COAWST_ENV
 
 # Loop range (format: YYYYMMDD)
-START_DATE=19950101
-END_DATE=19950105
+START_DATE=19950106
+END_DATE=19950106
 
 # Base directories
 STATIC_WPS_DIR=$WPS_STATIC_DIR

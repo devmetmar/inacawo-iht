@@ -7,11 +7,11 @@
 #SBATCH --mem=240G
 #SBATCH --time=03:00:00
 #SBATCH --partition=HDCAST
-#SBATCH --output=LOG/post_roms2d_%A_%a.out
-#SBATCH --error=LOG/post_roms2d_%A_%a.err
+#SBATCH --output=log/post_roms2d_%A_%a.out
+#SBATCH --error=log/post_roms2d_%A_%a.err
 
 source ~/.bashrc
-source ~/opt/miniforge3/bin/activate
+source $CONDA_BASE/etc/profile.d/conda.sh
 conda activate cawo_post
 
 ########################################
@@ -20,11 +20,11 @@ conda activate cawo_post
 START_DATE="1995-01-01"      # date corresponding to array index 0
 END_DATE="1995-01-05"        # inclusive; change as needed
 
-HIND_ROOT="/scratch/cawohdcst_ft2/data/cawo_hindcast_outputs"
-OUT_ROOT="/scratch/cawohdcst_ft2/data/postprocessed/ocean2d"
+HIND_ROOT=$CAWO_OUTPUT
+OUT_ROOT="$CAWO_POST/ocean2d"
 
 # Directory where post_roms3d_xesmf.py lives
-POSTPROC_DIR="/home/cawohdcst_ft2/postprocess"
+POSTPROC_DIR="$WORK_BASE/postprocess"
 
 # ROMS his numbers to process
 # 1 occurs only on f19950101; others (4,7,10,...) appear on all days

@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=32
 #SBATCH --exclusive
 #SBATCH --time=200:00:00
-#SBATCH --output=run_metgrid_loop_%j.log
+#SBATCH --output=log/run_metgrid_loop_%j.log
 #SBATCH --export=ALL
 
 set -x
@@ -13,8 +13,8 @@ date
 
 source $COAWST_ENV
 
-START_DATE=19950101
-END_DATE=19950105
+START_DATE=19950106
+END_DATE=19950106
 
 # Directories
 STATIC_WPS_DIR=$WPS_STATIC_DIR

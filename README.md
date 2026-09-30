@@ -35,10 +35,10 @@ preprocess/          hindcast_run/              postprocess/
 
 ## Environment setup
 
-Source `env.sh` before running any scripts. It defines paths for code, scratch data, model binaries, and static inputs.
+Source `env` before running any scripts. It defines paths for code, scratch data, model binaries, and static inputs.
 
 ```bash
-source /home/maritime_rnd/inacawo/hindcast/env.sh
+source /home/maritime_rnd/inacawo/hindcast/env
 ```
 
 | Variable | Purpose |
@@ -53,7 +53,7 @@ source /home/maritime_rnd/inacawo/hindcast/env.sh
 | `GRID_DATA` | Static ROMS grid data (nudging, MSL, etc.) |
 | `ROMS_FORCING` | LiveOcean-generated ROMS forcing files |
 
-Edit `env.sh` to match your machine and scratch layout before first use.
+Edit `env` to match your machine and scratch layout before first use.
 
 ## Directory structure
 
@@ -81,7 +81,7 @@ Edit `env.sh` to match your machine and scratch layout before first use.
 │   ├── LO_data/           # Grid definitions (cawo)
 │   ├── LO_output/         # Forcing output (gitignored except grid metadata)
 │   └── LO_user/
-├── env.sh
+├── env
 └── README.md
 ```
 
@@ -91,7 +91,7 @@ All date ranges below are examples. Edit the `start_date` / `end_date` variables
 
 ### 1. Preprocessing
 
-Run from `$WORK_BASE/preprocess/` (or the equivalent path under this repo) after sourcing `env.sh`.
+Run from `$WORK_BASE/preprocess/` (or the equivalent path under this repo) after sourcing `env`.
 
 #### ERA5 atmospheric forcing
 
@@ -161,7 +161,7 @@ Reads ERA5 wave GRIB from `$CAWO_INPUT/era5_waves/` and writes TPAR files to `$C
 ### 2. Hindcast run setup
 
 ```bash
-source env.sh
+source env
 cd hindcast_run
 
 # Create one folder per day
@@ -241,6 +241,6 @@ Conda environment specifications for data download and postprocessing are in `sr
 
 ## Notes
 
-- **Working copy vs repo**: `env.sh` sets `WORK_BASE` to `/home/maritime_rnd/project/hindcast`, which may be a deployed copy of this repository. Scripts are typically run from `WORK_BASE` after sourcing `env.sh`.
-- **ROMS forcing path**: `ROMS_FORCING` in `env.sh` points to `$CAWO_INPUT/roms_forcing`. Using local `Lfun` utils instead of installed `lo_tools` can generate NetCDF forcing without updating `LO_output/results.txt`.
-- **Static data**: WRF/WPS static files, SWAN bathymetry/coordinates, and ROMS grid data are read from paths defined in `env.sh` (`WPS_STATIC_DIR`, `SWAN_STATIC`, `GRID_DATA`, etc.) and are not part of this repository.
+- **Working copy vs repo**: `env` sets `WORK_BASE` to `/home/maritime_rnd/project/hindcast`, which may be a deployed copy of this repository. Scripts are typically run from `WORK_BASE` after sourcing `env`.
+- **ROMS forcing path**: `ROMS_FORCING` in `env` points to `$CAWO_INPUT/roms_forcing`. Using local `Lfun` utils instead of installed `lo_tools` can generate NetCDF forcing without updating `LO_output/results.txt`.
+- **Static data**: WRF/WPS static files, SWAN bathymetry/coordinates, and ROMS grid data are read from paths defined in `env` (`WPS_STATIC_DIR`, `SWAN_STATIC`, `GRID_DATA`, etc.) and are not part of this repository.

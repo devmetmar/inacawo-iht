@@ -62,7 +62,7 @@ export SLURM_CPU_BIND=NONE
 #export PROFILER_DISABLE=1
 #export PROFILER_UNPLUG=1
 
-export LD_LIBRARY_PATH="$LIBDEP:$LD_LIBRARY_PATH" # LIBDEP from env.sh
+export LD_LIBRARY_PATH="$LIBDEP:$LD_LIBRARY_PATH" # LIBDEP from env
 
 ##time /opt/software/intel/oneapi/mpi/2021.5.1/bin/mpiexec -verbose -np 4608 -ppn 96 ./wrf.exe
 

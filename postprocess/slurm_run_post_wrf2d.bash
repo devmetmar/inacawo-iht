@@ -7,11 +7,11 @@
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
 #SBATCH --partition=HDCAST
-#SBATCH --output=LOG/post2d_%A_%a.out
+#SBATCH --output=log/post2d_%A_%a.out
 
 source ~/.bashrc
-source ~/opt/miniforge3/bin/activate
-conda activate ca/scratch/cawohdcst_ft/home/cawohdcst_ft2/cawo_post.yml ~/wo_post
+source $CONDA_BASE/etc/profile.d/conda.sh
+conda activate cawo_post
 
 ########################################
 # USER INPUT
@@ -19,8 +19,8 @@ conda activate ca/scratch/cawohdcst_ft/home/cawohdcst_ft2/cawo_post.yml ~/wo_pos
 START_DATE="1995-01-01"      # date corresponding to array index 0
 END_DATE="1995-01-05"        # inclusive; change as needed
 
-HIND_ROOT="/scratch/cawohdcst_ft2/data/cawo_hindcast_outputs"
-OUT_ROOT="/scratch/cawohdcst_ft2/data/postprocessed/wrf2d"
+HIND_ROOT=$CAWO_OUTPUT
+OUT_ROOT="$CAWO_POST/wrf2d"
 
 # ---- Manual flag: skip first 3-hourly file in EACH day? ----
 # 0 = do NOT skip (process all 3-hourly files for each day)

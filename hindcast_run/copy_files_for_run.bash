@@ -11,8 +11,8 @@ SWAN_BCS="$CAWO_INPUT/swan_bcs"
 MODEL_DIR="$MODEL_BASE/cawo_3way_swell_mods_no_ramp_tides"
 
 # === Define date range ===
-date_start=19950102
-date_end=19950105
+date_start=19950105
+date_end=19950106
 
 # --- helper functions ---
 

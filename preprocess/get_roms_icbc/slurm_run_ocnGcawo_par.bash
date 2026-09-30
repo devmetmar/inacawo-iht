@@ -17,8 +17,8 @@ conda activate loenv
 ########################################
 # USER INPUT
 ########################################
-START_DATE="1995-01-02"
-END_DATE="1995-01-05"    # inclusive
+START_DATE="1995-01-06"
+END_DATE="1995-01-06"    # inclusive
 ########################################
 
 TASK_ID=${SLURM_ARRAY_TASK_ID}
