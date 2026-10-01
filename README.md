@@ -76,18 +76,15 @@ export SWAN_STATIC=/path/to/swan_static_cycle
 ```
 inacawo-iht/
   setup_env.bash          # source this first
-  env                     # portable path definitions
-  preprocess/
-    get_era5/             # ERA5 download
-    get_glorys/           # GLORYS download
-    wps_run/              # ungrib → metgrid → real
-    get_swan_bry/         # SWAN TPAR BCs
-    get_roms_icbc/        # ROMS IC/BC wrappers (primary LO entrypoints)
-    LO_user/              # LiveOcean user config + forcing drivers (git-tracked)
-  hindcast_run/           # daily folders, templates, run driver
-  postprocess/            # xesmf regrid to CAWO_LL025
+  env                     # iht workflow paths (sources inacawo-deps/env)
+  preprocess/             # see preprocess/README.md
+    get_era5/ get_glorys/ wps_run/ get_swan_bry/ get_roms_icbc/ LO_user/
+  hindcast_run/           # see hindcast_run/README.md
+  postprocess/            # see postprocess/README.md
   README.md
 ```
+
+Each major subdirectory has its own `README.md` with scripts, env vars, and usage.
 
 ## Workflow
 
