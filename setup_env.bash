@@ -28,4 +28,13 @@ fi
 
 # shellcheck disable=SC1091
 source "${CONDA_BASE}/etc/profile.d/conda.sh"
-conda activate hindcast
+# Prefer envs under this Miniforge (set in inacawo-deps/env); activate by prefix
+export CONDA_ENVS_DIRS="${CONDA_ENVS_DIRS:-${CONDA_BASE}/envs}"
+_HINDCAST_PREFIX="${HINDCAST_ENV_PREFIX:-${CONDA_ENVS_DIRS}/${HINDCAST_ENV_NAME:-hindcast}}"
+if [[ -d "${_HINDCAST_PREFIX}/conda-meta" ]]; then
+  conda activate "${_HINDCAST_PREFIX}"
+else
+  echo "ERROR: hindcast env not found at ${_HINDCAST_PREFIX}" >&2
+  echo "       Run: bash \$HOME/inacawo-deps/install_hindcast_env.bash" >&2
+  return 1 2>/dev/null || exit 1
+fi
