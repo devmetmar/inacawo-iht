@@ -20,6 +20,7 @@ The same test took 55 sec on perigee with uncompressed files.
 
 # imports
 import sys
+import os
 from lo_tools import Lfun, zrfun, zfun
 import argparse
 from time import time
@@ -39,12 +40,17 @@ def _daterange(d0, d1):
         dt += one
 
 # --- helper to build your file list across days ---
-def build_fn_list_for_cawo(ds0_str, ds1_str, base_dir=Path("/scratch/cawohdcst/data/cawo_hindcast_outputs")):
+def build_fn_list_for_cawo(ds0_str, ds1_str, base_dir=None):
     """
     Return a list of Path objects for:
-    /scratch/.../fYYYYMMDD/cawo_g2.8.0_his_YYYYMMDD_12_*.nc
+    /scratch/$USER/.../fYYYYMMDD/cawo_g2.8.0_his_YYYYMMDD_12_*.nc
     ordered by date and then by sequence number.
     """
+    if base_dir is None:
+        base_dir = Path(os.environ.get(
+            'CAWO_OUTPUT',
+            f"/scratch/{os.environ.get('USER')}/inacawo/cawo_hindcast/cawo_output",
+        ))
     d0 = datetime.strptime(ds0_str, "%Y.%m.%d")
     d1 = datetime.strptime(ds1_str, "%Y.%m.%d")
     out = []
@@ -137,7 +143,7 @@ lat = Ldir['lat']
 fn_list = build_fn_list_for_cawo(Ldir['ds0'], Ldir['ds1'])
 
 if len(fn_list) == 0:
-    print("ERROR: No input files found in /scratch/cawohdcst/data/cawo_hindcast_outputs for the requested dates.")
+    print("ERROR: No input files found under CAWO_OUTPUT for the requested dates.")
     sys.exit(1)
 
 # Use the first day's first split file to get grid/S-coord info

@@ -8,11 +8,20 @@
 #SBATCH --partition=HDCAST
 #SBATCH --output=slurm_%A_%a.out
 
-# source ~/.bashrc
-# conda activate loenv
-source ~/opt/miniforge3/bin/activate
-conda activate loenv
 
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
+
+# source ~/.bashrc
 start_date="2020-01-02"
 date_to_run=$(date -d "$start_date + ${SLURM_ARRAY_TASK_ID} days" +%Y.%m.%d)
 

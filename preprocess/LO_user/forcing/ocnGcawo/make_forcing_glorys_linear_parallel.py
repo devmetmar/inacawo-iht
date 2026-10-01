@@ -20,7 +20,7 @@ from scipy.interpolate import interp1d
 from scipy.interpolate import griddata
 
 # grid and parameters
-grid_folder = '/scratch/cawohdcst_ft2/data/grids/'
+grid_folder = os.environ['GRID_DATA'].rstrip('/') + '/'
 grdname = grid_folder + 'grid.nc'
 ds_grd = xr.open_dataset(grdname)
 print('read grd')
@@ -40,10 +40,10 @@ date_str = sys.argv[1]  # e.g., '1995-01-04'
 date_fmt = date_str.replace("-", "")
 
 # Paths
-glorys_folder = '/scratch/cawohdcst_ft2/mercator/'
+glorys_folder = os.environ['GLORYS_BASE_DIR'].rstrip('/') + '/'
 g_file = os.path.join(glorys_folder, f"GLORYS_Reanalysis_LO_{date_str}T00:00:00.nc")
 
-cawo_folder = '/scratch/cawohdcst_ft2/data/roms_forcing/'
+cawo_folder = os.environ['ROMS_FORCING'].rstrip('/') + '/'
 template_folder = os.path.join(cawo_folder, f"f{date_fmt}", "ocnA0")
 
 # Read input datasets
@@ -53,7 +53,7 @@ ds_clm = xr.open_dataset(os.path.join(template_folder, "ocean_clm.nc"))
 ds_bry = xr.open_dataset(os.path.join(template_folder, "ocean_bry.nc"))
 
 # Load Mercator mean seal level
-ds_msl = xr.open_dataset('/scratch/cawohdcst_ft2/data/grids/mercator_msl.nc')
+ds_msl = xr.open_dataset('/scratch/' + os.environ.get('USER', 'USER') + '/data/grids/mercator_msl.nc')
 print('read msl')
 
 # Output folder

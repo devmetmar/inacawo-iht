@@ -20,7 +20,7 @@ from scipy.interpolate import interp1d
 from scipy.interpolate import griddata
 
 # grid and parameters
-grid_folder = '/scratch/cawohdcst_ft2/data/grids/'
+grid_folder = os.environ['GRID_DATA'].rstrip('/') + '/'
 grdname = grid_folder + 'grid.nc'
 ds_grd = xr.open_dataset(grdname)
 print('read grd')
@@ -33,11 +33,11 @@ vtransform = df_scoord.VALUES[4]
 vstretch = df_scoord.VALUES[5]
 
 # Glorys files
-glorys_folder = '/scratch/cawohdcst_ft2/mercator/'
+glorys_folder = os.environ['GLORYS_BASE_DIR'].rstrip('/') + '/'
 g_list = sorted(glob.glob(glorys_folder + '*.nc'))
 
 # LO cas2k templates
-cawo_folder = '/scratch/cawohdcst_ft2/data/roms_forcing/'
+cawo_folder = os.environ['ROMS_FORCING'].rstrip('/') + '/'
 lo_list = sorted(glob.glob(cawo_folder + 'f1995*'))
 
 # 
@@ -50,7 +50,7 @@ print('read clm template')
 ds_bry = xr.open_dataset(lo_list[1]+'/'+'ocnA0/ocean_bry.nc')
 print('read bry template')
 # Load Mercator mean seal level
-ds_msl = xr.open_dataset('/scratch/cawohdcst_ft2/data/grids/mercator_msl.nc')
+ds_msl = xr.open_dataset('/scratch/' + os.environ.get('USER', 'USER') + '/data/grids/mercator_msl.nc')
 print('read msl')
 os.makedirs(lo_list[1]+'/'+'ocnG', exist_ok = True)
 

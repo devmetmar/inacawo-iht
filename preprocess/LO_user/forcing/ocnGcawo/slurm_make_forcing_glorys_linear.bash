@@ -6,9 +6,18 @@
 #SBATCH --partition=HDCAST
 #SBATCH --output=log_make_linear.out
 
-source ~/.bashrc
-source ~/opt/miniforge3/bin/activate
-conda activate loenv
+
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
 
 echo "Running make linear forcing for date: 2020.01.01"
-/home/cawohdcst_ft2/opt/miniforge3/envs/loenv/bin/python make_forcing_glorys_linear.py
+python make_forcing_glorys_linear.py

@@ -40,7 +40,7 @@ date_fmt = Ldir['date_string'].replace('.', '')      # 'YYYYMMDD'
 frc_name = Ldir['frc']                                # e.g., 'ocnA0'
 
 # Target root
-cawo_root = Path('/scratch/cawohdcst_ft2/data/roms_forcing') #ganti sesuai usernam /scratch/{username}/data/roms_forcing
+cawo_root = Path(os.environ['ROMS_FORCING']) #ganti sesuai usernam /scratch/{username}/data/roms_forcing
 
 # Final destination fYYYYMMDD/<frc>
 out_dir = cawo_root / f"f{date_fmt}" / frc_name

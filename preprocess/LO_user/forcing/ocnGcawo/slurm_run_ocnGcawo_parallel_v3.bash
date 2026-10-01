@@ -10,8 +10,20 @@
 #SBATCH --output=LOG/log_ocnGcawo_%A_%a.out
 #SBATCH --error=LOG/log_ocnGcawo_%A_%a.err
 
+
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
+
 # source ~/.bashrc
-# conda activate loenv
 
 ########################################
 # USER INPUT
@@ -33,7 +45,7 @@ fi
 
 echo "TASK_ID $TASK_ID processing date $RUN_DATE"
 
-/home/cawohdcst_ft2/opt/miniforge3/envs/loenv/bin/python -u make_forcing_glorys_linear_parallel.py "$RUN_DATE"
+python -u make_forcing_glorys_linear_parallel.py "$RUN_DATE"
 STATUS=$?
 
 if [ $STATUS -ne 0 ]; then

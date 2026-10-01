@@ -18,7 +18,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 # grid and parameters
-grid_folder = '/home/cawohdcst/LO_data/grids/cawo/'
+grid_folder = os.environ['GRID_DATA'].rstrip('/') + '/'
 grdname = grid_folder + 'grid.nc'
 ds_grd = xr.open_dataset(grdname)
 df_scoord = pd.read_csv(grid_folder + 'S_COORDINATE_INFO.csv')
@@ -30,11 +30,11 @@ vtransform = df_scoord.VALUES[4]
 vstretch = df_scoord.VALUES[5]
 
 # Glorys files
-glorys_folder = '/home/cawohdcst/LO_data/glorys/'
+glorys_folder = os.environ['GLORYS_BASE_DIR'].rstrip('/') + '/'
 g_list = sorted(glob.glob(glorys_folder + '*.nc'))
 
 # LO cas2k templates
-cawo_folder = '/home/cawohdcst/LO_output/forcing/cawo/'
+cawo_folder = os.environ['ROMS_FORCING'].rstrip('/') + '/'
 lo_list = sorted(glob.glob(cawo_folder + 'f2024*'))
 
 # 

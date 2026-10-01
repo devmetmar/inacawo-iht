@@ -1,5 +1,18 @@
 #!/bin/bash
 
+
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
+
 start_date="1995-01-02"
 end_date="1995-01-05"
 

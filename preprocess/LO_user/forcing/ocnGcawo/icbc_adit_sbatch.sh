@@ -1,4 +1,5 @@
 #!/bin/bash
+source "${HOME}/inacawo-iht/setup_env.bash"
 #SBATCH --job-name=mk_forcing
 #SBATCH --partition=HDCAST
 #SBATCH --ntasks=1
@@ -8,10 +9,10 @@
 #SBATCH --output=log_mk_forcing_%j.log
 #SBATCH --error=log_mk_forcing_%j.log
     
-cd /home/cawohdcst_ft2/LO_user/forcing/ocnGcawo/ || exit 1
+cd ${LO_USER}/forcing/ocnGcawo/ || exit 1
 
 
-source /home/cawohdcst_ft2/opt/miniforge3/etc/profile.d/conda.sh
-conda activate loenv
+source ${CONDA_BASE}/etc/profile.d/conda.sh
+conda activate hindcast
 
 python -u make_forcing_glorys_linear.py

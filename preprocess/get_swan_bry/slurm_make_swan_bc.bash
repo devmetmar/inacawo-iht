@@ -6,9 +6,18 @@
 #SBATCH --partition=HDCAST
 #SBATCH --output=run_swan_bc_%j.log
 
-source ~/.bashrc
-source $CONDA_BASE/etc/profile.d/conda.sh
-conda activate loenv
+
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
 
 # Run the Python scrip
 python make_swan_bc.py 19950106 19950106

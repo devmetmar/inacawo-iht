@@ -6,9 +6,18 @@
 #SBATCH --partition=HDCAST
 #SBATCH --output=log_start_ocnA0.out
 
-source ~/.bashrc
-source ~/opt/miniforge3/bin/activate
-conda activate loenv
+
+# InaCAWO portable env + hindcast conda
+if [[ -f "${HOME}/inacawo-iht/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${HOME}/inacawo-iht/setup_env.bash"
+elif [[ -n "${WORK_BASE:-}" && -f "${WORK_BASE}/setup_env.bash" ]]; then
+  # shellcheck disable=SC1091
+  source "${WORK_BASE}/setup_env.bash"
+else
+  echo "ERROR: missing setup_env.bash" >&2
+  exit 1
+fi
 
 echo "Running forcing for date: 1998.10.01"
-/home/cawohdcst_ft2/opt/miniforge3/envs/loenv/bin/python driver_forcing3.py -g cawo -0 "1998.10.01" -s "new" -f ocnA0
+python driver_forcing3.py -g cawo -0 "1998.10.01" -s "new" -f ocnA0
