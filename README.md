@@ -24,11 +24,8 @@ preprocess/          hindcast_run/              postprocess/
 
 - HPC cluster with SLURM and the `HDCAST` partition.
 - Intel oneAPI MPI/compiler modules (see `slurm_run_cawo_3way_hdcst.bash`).
-- Conda environments:
-  - `loenv` — LiveOcean forcing and preprocessing (`conda activate loenv`).
-  - `cawo_post` — postprocessing with `xesmf` (see `src/conda_env/cawo_post.yml`).
-  - `cdsapi` / `copernicusmarine` — data download (see `src/conda_env/`).
-- Built COAWST binaries under `$MODEL_BASE` (e.g. `cawo_3way_swell_mods_no_ramp_tides`, `cawo_3way_swell_mods_ramp_tides`).
+- Conda environment `hindcast` from `$HOME/inacawo-deps/hindcast.yml` (LO + cdsapi + copernicusmarine + xesmf).
+- Built COAWST binaries under `$MODEL_BASE` (e.g. ramp / no-ramp 3-way builds).
 - API credentials:
   - [CDS API](https://cds.climate.copernicus.eu/) for ERA5 downloads.
   - [Copernicus Marine](https://marine.copernicus.eu/) for GLORYS downloads.
@@ -72,18 +69,15 @@ Edit `env` to match your machine and scratch layout before first use.
 ├── preprocess/            # Data download and boundary-condition preparation
 │   ├── get_era5/          # ERA5 surface, pressure-level, and wave downloads
 │   ├── get_glorys/        # GLORYS ocean reanalysis download
-│   ├── get_roms_icbc/     # ROMS IC/BC via LiveOcean forcing driver
+│   ├── get_roms_icbc/     # ROMS IC/BC scripts (wrappers around LO forcing)
 │   ├── get_swan_bry/      # SWAN spectral boundary conditions from ERA5 waves
-│   └── wps_run/           # WPS ungrib → metgrid → real
-├── src/                   # LiveOcean (LO) source tree and conda env specs
-│   ├── conda_env/
-│   ├── LO/                # LiveOcean forcing and utilities
-│   ├── LO_data/           # Grid definitions (cawo)
-│   ├── LO_output/         # Forcing output (gitignored except grid metadata)
-│   └── LO_user/
+│   ├── wps_run/           # WPS ungrib → metgrid → real
+│   └── LO_user/           # LiveOcean user config + forcing drivers (preprocess)
 ├── env
 └── README.md
 ```
+
+LiveOcean **code** lives in `$HOME/inacawo-deps/LO` (conda editable). LiveOcean **user config / drivers** live in `preprocess/LO_user/`. Data and output are on scratch: `/scratch/$USER/LO_data` and `/scratch/$USER/LO_output`.
 
 ## Workflow
 
@@ -146,7 +140,7 @@ sbatch slurm_run_ocnA0_day1.bash
 sbatch slurm_run_ocnGcawo_day1.bash
 ```
 
-Forcing files are written under `$ROMS_FORCING` (and tracked in `src/LO_output/` when using the installed `lo_tools`).
+Forcing files are written under `$ROMS_FORCING` / `/scratch/$USER/LO_output` (via `lo_tools` from `inacawo-deps/LO`).
 
 #### SWAN boundary conditions
 
@@ -229,18 +223,22 @@ The first hindcast day differs from subsequent days:
 | ROMS forcing | `slurm_run_ocnA0_day1.bash`, `slurm_run_ocnGcawo_day1.bash` | `slurm_run_ocnA0_par.bash`, `slurm_run_ocnGcawo_par.bash` |
 | `modify_dot_in.py` | add `--day1` flag | default |
 
-## LiveOcean source (`src/`)
+## LiveOcean (preprocess)
 
-The `src/LO/` tree is a copy of [LiveOcean](https://github.com/parkerjco/LiveOcean) configured for the `cawo` grid. It is used primarily by `preprocess/get_roms_icbc/` for generating ROMS open-boundary and initial-condition forcing. Grid metadata lives in `src/LO_data/grids/cawo/`.
+LiveOcean is used only in the **preprocess** stage (ROMS IC/BC forcing):
 
-Conda environment specifications for data download and postprocessing are in `src/conda_env/`:
+| Piece | Location |
+|-------|----------|
+| Code (`lo_tools`) | `$HOME/inacawo-deps/LO` — installed by `hindcast.yml` |
+| User config / drivers | `preprocess/LO_user/` (`get_lo_info.py`, `driver/`, `forcing/`) |
+| Wrapper scripts | `preprocess/get_roms_icbc/` |
+| Data | `/scratch/$USER/LO_data` |
+| Output | `/scratch/$USER/LO_output` |
 
-- `cdsapi.yml` — ERA5 CDS downloads
-- `copernicusmarine.yml` — GLORYS Copernicus Marine downloads
-- `cawo_post.yml` — xesmf postprocessing stack
+Activate the unified conda env (`hindcast`) instead of separate `loenv` / download envs when using this layout.
 
 ## Notes
 
-- **Working copy vs repo**: `env` sets `WORK_BASE` to `/home/maritime_rnd/project/hindcast`, which may be a deployed copy of this repository. Scripts are typically run from `WORK_BASE` after sourcing `env`.
-- **ROMS forcing path**: `ROMS_FORCING` in `env` points to `$CAWO_INPUT/roms_forcing`. Using local `Lfun` utils instead of installed `lo_tools` can generate NetCDF forcing without updating `LO_output/results.txt`.
+- **Working copy**: source `$HOME/inacawo-iht/env` (`WORK_BASE=$HOME/inacawo-iht`). Paths use `$HOME` and `/scratch/$USER` (no hardcoded username).
+- **ROMS forcing path**: `ROMS_FORCING` in `env` points at scratch under the user tree.
 - **Static data**: WRF/WPS static files, SWAN bathymetry/coordinates, and ROMS grid data are read from paths defined in `env` (`WPS_STATIC_DIR`, `SWAN_STATIC`, `GRID_DATA`, etc.) and are not part of this repository.

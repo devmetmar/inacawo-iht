@@ -1,51 +1,63 @@
 #!/bin/bash
-# 
+# Portable InaCAWO hindcast environment — no hardcoded username.
+# Source from any machine after cloning inacawo-* under $HOME:
+#   source $HOME/inacawo-iht/env
+#
+# -----------------
+# User / scratch roots
+# -----------------
+export HOME_DIR="${HOME}"
+export USER_NAME="${USER}"
+export SCRATCH="/scratch/${USER}"
+#
 # -----------------
 # Working directory
 # -----------------
-export WORK_BASE='/home/cawohdcst_ft2/tyo'
-export CAWO_HINDCAST_BASE='/scratch/cawohdcst_ft2/tyo/cawo_hindcast'
-export MODEL_BASE='/home/cawohdcst_ft2/models'
-export CONDA_BASE='/home/cawohdcst_ft2/opt/miniforge3'
+export WORK_BASE="${HOME}/inacawo-iht"
+export CAWO_HINDCAST_BASE="${SCRATCH}/inacawo/cawo_hindcast"
+export MODEL_BASE="${HOME}/inacawo-src"
+export CONDA_BASE="${HOME}/opt/miniforge3"
+#
+# LiveOcean — code in deps; user overrides under preprocess/ (ROMS IC/BC forcing)
+export LO="${HOME}/inacawo-deps/LO"
+export LO_USER="${HOME}/inacawo-iht/preprocess/LO_user"
+export LO_DATA="${SCRATCH}/LO_data"
+export LO_OUTPUT="${SCRATCH}/LO_output"
 #
 # ----------------
 # Lib dependencies
 # ----------------
-export LIBDEP='/home/cawohdcst_ft2/apps/cawo_depends/intel_2021.5.0/build/lib'
-export COAWST_ENV='/home/cawohdcst_ft2/hindcast_scripts/coawst.bash_env_intel.source_oneapi'
+export LIBDEP="${HOME}/inacawo-deps/apps/cawo_depends/intel_2021.5.1/build/lib"
+export COAWST_ENV="${HOME}/inacawo-iht/coawst.bash_env_intel.source_oneapi"
 # --------------------
 # Global Data Download
 # --------------------
-export CAWO_INPUT=$CAWO_HINDCAST_BASE'/cawo_input'
+export CAWO_INPUT="${CAWO_HINDCAST_BASE}/cawo_input"
 # --------------
 # Preprocessing
 # --------------
-export WPS_RUN_DIR=$CAWO_INPUT'/wps_run'
-export WPS_STATIC_DIR='/scratch/cawohdcst_ft/data/static/wps/wps-4.3.1_static'
-export WRF_DIR='/scratch/cawohdcst_ft/data/static/wrf'
-export WRF_STATIC_DIR=$WRF_DIR'/wrf-4.3.1_static'
-export WRF_STATIC_EXTRA_DIR=$WRF_DIR'/extra_static'
-export GEOGRID_FILE='/scratch/cawohdcst_ft/data/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3'
-export GRID_DATA='/scratch/cawohdcst_ft2/data/grids'
-export ERA5_BASE_DIR=$CAWO_INPUT'/era5'
-export GLORYS_BASE_DIR=$CAWO_INPUT'/mercator'
-export ROMS_FORCING='/scratch/cawohdcst_ft2/data/roms_forcing' # tied to loenv, which defined at the conda env creation.
-# export ROMS_FORCING=$CAWO_INPUT'/roms_forcing' # ini bisa dipakai dengan mengubah Lfun dkk diimport dari utils instead dari installed lo_tools pada file driver_forcing3.py, tapi prosesnya tidak menghasilkan results.txt di LO_output, meski output data nc-ya tergenerate di folder yang didefine di line ini. 
-#
-# LiveOcean
-# export LO_Output=$DATA_DIR'/LO_output'
-# export LO_User=$DATA_DIR'/LO_output'
+export WPS_RUN_DIR="${CAWO_INPUT}/wps_run"
+# Shared site static inputs (not user-specific). Override if your site differs.
+export WPS_STATIC_DIR="${WPS_STATIC_DIR:-/scratch/cawohdcst_ft/data/static/wps/wps-4.3.1_static}"
+export WRF_DIR="${WRF_DIR:-/scratch/cawohdcst_ft/data/static/wrf}"
+export WRF_STATIC_DIR="${WRF_STATIC_DIR:-${WRF_DIR}/wrf-4.3.1_static}"
+export WRF_STATIC_EXTRA_DIR="${WRF_STATIC_EXTRA_DIR:-${WRF_DIR}/extra_static}"
+export GEOGRID_FILE="${GEOGRID_FILE:-/scratch/cawohdcst_ft/data/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3}"
+export GRID_DATA="${SCRATCH}/data/grids"
+export ERA5_BASE_DIR="${CAWO_INPUT}/era5"
+export GLORYS_BASE_DIR="${CAWO_INPUT}/mercator"
+export ROMS_FORCING="${SCRATCH}/data/roms_forcing"
 #
 # -----------------
 # Model integration
 # -----------------
-export CAWO_HINDCAST_RUN=$CAWO_HINDCAST_BASE'/cawo_hindcast_run'
-export SWAN_STATIC='/scratch/cawohdcst_ft2/data/cawo_hindcast_run/test_runs/cycle_2024061018_v5'
-export VARINFO=$SWAN_STATIC
-export GRID_SCRIP='/scratch/cawohdcst_ft2/data/cawo_hindcast_run'
-export IN_TEMPLATES=$WORK_BASE'/hindcast_run/in_templates'
+export CAWO_HINDCAST_RUN="${CAWO_HINDCAST_BASE}/cawo_hindcast_run"
+export SWAN_STATIC="${SCRATCH}/data/cawo_hindcast_run/test_runs/cycle_2024061018_v5"
+export VARINFO="${SWAN_STATIC}"
+export GRID_SCRIP="${SCRATCH}/data/cawo_hindcast_run"
+export IN_TEMPLATES="${WORK_BASE}/hindcast_run/in_templates"
 # --------------
 # Postprocessing
 # --------------
-export CAWO_OUTPUT=$CAWO_HINDCAST_BASE'/cawo_output'
-export CAWO_POST=$CAWO_HINDCAST_BASE'/cawo_post'
+export CAWO_OUTPUT="${CAWO_HINDCAST_BASE}/cawo_output"
+export CAWO_POST="${CAWO_HINDCAST_BASE}/cawo_post"
