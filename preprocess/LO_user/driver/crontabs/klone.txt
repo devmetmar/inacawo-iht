@@ -1,0 +1,24 @@
+LANG=en-US.UTF-8
+LOd="/gscratch/macc/parker/LO/driver"
+
+00 03 * * * source ~/.bashrc; python3 $LOd/driver_roms3.py -g cas6 -t traps2 -x x2b -r forecast -np 200 -N 40 < /dev/null > $LOd/ak_cron.log
+00 08 * * * source ~/.bashrc; python3 $LOd/driver_roms3.py -g cas6 -t traps2 -x x2b -r forecast -np 200 -N 40 < /dev/null > $LOd/ak_cron_2.log
+00 17 * * * source ~/.bashrc; python3 $LOd/driver_roms3.py -g cas6 -t traps2 -x x2b -r forecast -np 200 -N 40 < /dev/null > $LOd/ak_cron_3.log
+
+00 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' pmacc@uw.edu < $LOd/ak_cron.log
+01 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' darrd@uw.edu < $LOd/ak_cron.log
+02 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' ebroatch@uw.edu < $LOd/ak_cron.log
+03 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' auroral@uw.edu < $LOd/ak_cron.log
+04 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' kmhewett@uw.edu < $LOd/ak_cron.log
+05 07 * * * source ~/.bashrc; mail -s 'LO forecast klone' jxiong7@uw.edu < $LOd/ak_cron.log
+
+00 13 * * * source ~/.bashrc; python3 $LOd/driver_romsN.py -g wgh1 -t t0 -x xn0b -s perfect -r forecast -np 200 -N 40 < /dev/null > $LOd/wgh1_forecast.log
+00 16 * * * source ~/.bashrc; mail -s 'wgh forecast klone' pmacc@uw.edu < $LOd/wgh1_forecast.log
+
+00 12 * * * crontab <<< $(crontab -l)
+
+# 20 03 * * * source ~/.bashrc; python3 $LOd/driver_roms2.py -g cas6 -t v0 -x u0kb -r forecast -np 400 -N 40 --old_roms True > $LOd/ak_cron.log
+# 10 10 * * * source ~/.bashrc; python3 $LOd/driver_roms2.py -g cas6 -t v0 -x u0kb -r forecast -np 400 -N 40 --old_roms True > $LOd/ak_cron_2.log
+# 00 14 * * * source ~/.bashrc; python3 $LOd/driver_roms2.py -g cas6 -t v0 -x u0kb -r forecast -np 400 -N 40 --old_roms True > $LOd/ak_cron_3.log
+
+

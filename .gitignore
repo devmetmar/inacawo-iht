@@ -9,3 +9,12 @@ forecast_examples
 
 models/*
 analysis/*
+# LO_user runtime / local artefacts
+LOG/
+**/LOG/
+driver/out/
+driver/out_dir/
+*.bk
+*.log
+log.txt
+**/log.txt
