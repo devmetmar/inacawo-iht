@@ -52,7 +52,7 @@ print('read clm template')
 ds_bry = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_bry.nc')
 print('read bry template')
 # Load Mercator mean seal level
-ds_msl = xr.open_dataset('/scratch/' + os.environ.get('USER', 'USER') + '/data/grids/mercator_msl.nc')
+ds_msl = xr.open_dataset(grid_folder + 'mercator_msl.nc')
 print('read msl')
 os.makedirs(lo_list[0]+'/'+'ocnG', exist_ok = True)
 

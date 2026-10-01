@@ -5,8 +5,8 @@ import os
 from datetime import datetime, timedelta
 
 # ===== CONFIG =====
-indir_base = os.environ.get("CAWO_INPUT")+"/"+"era5_waves"   # Base dir for GRIB files
-outdir_base = os.environ.get("CAWO_INPUT")+"/"+"swan_bcs"    # Base dir for output BC files
+indir_base = os.environ.get("SCRATCH_PREPROCESS")+"/"+"era5_waves"   # Base dir for GRIB files
+outdir_base = os.environ.get("SCRATCH_PREPROCESS")+"/"+"swan_bcs"    # Base dir for output BC files
 print(f"indir_base {indir_base}")
 print(f"outdir_base {outdir_base}")
 lon_idx_east = 111

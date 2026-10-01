@@ -49,7 +49,7 @@ ds_clm = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_clm.nc')
 ds_bry = xr.open_dataset(lo_list[0]+'/'+'ocnA0/ocean_bry.nc')
 
 # Load Mercator mean seal level
-ds_msl = xr.open_dataset(f'/scratch/{os.environ.get("USER")}/data/grids/mercator_msl.nc')
+ds_msl = xr.open_dataset(f'{grid_folder.rstrip("/")}/mercator_msl.nc')
 
 os.makedirs(lo_list[0]+'/'+'ocnG', exist_ok = True)
 

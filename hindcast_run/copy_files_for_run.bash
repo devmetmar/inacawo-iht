@@ -20,7 +20,7 @@ shopt -s nullglob
 
 RUNS_DIR=$CAWO_HINDCAST_RUN
 WPS_BASE=$WPS_RUN_DIR
-SWAN_BCS="$CAWO_INPUT/swan_bcs"
+SWAN_BCS="$SCRATCH_PREPROCESS/swan_bcs"
 MODEL_DIR="$MODEL_BASE/cawo_3way_swell_mods_no_ramp_tides"
 
 # === Define date range ===

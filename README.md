@@ -19,16 +19,11 @@ git clone <inacawo-deps-url>  $HOME/inacawo-deps
 git clone <inacawo-iht-url>   $HOME/inacawo-iht
 # (+ inacawo-src as needed)
 
-# 2) Conda env (must run from inacawo-deps so ./LO/lo_tools resolves)
-cd $HOME/inacawo-deps
-mamba env create -f hindcast.yml
-conda activate hindcast
+# 2) Shared dirs (LO_* + CAWO_HINDCAST_BASE), Miniforge, hindcast env
+bash $HOME/inacawo-deps/install_hindcast_env.bash
+# optional: --force-recreate for a clean rebuild
 
-# 3) Scratch layout (created as needed by scripts)
-mkdir -p /scratch/$USER/LO_data /scratch/$USER/LO_output
-mkdir -p /scratch/$USER/inacawo/cawo_hindcast
-
-# 4) API credentials
+# 3) API credentials
 #    ~/.cdsapirc  (ERA5 / CDS)
 #    copernicusmarine login  (GLORYS)
 ```
@@ -41,27 +36,41 @@ Every SLURM/interactive script should load:
 source $HOME/inacawo-iht/setup_env.bash
 ```
 
-That sources `env` (portable `$HOME` / `/scratch/$USER` paths) and `conda activate hindcast`.
+That sources `env` → `inacawo-deps/env` (shared `LO_*` / `CAWO_HINDCAST_BASE` / conda) then iht workflow paths, and `conda activate hindcast`.
 
-Key variables (see `env`):
+Key variables (see `inacawo-deps/env` + `env`):
 
 | Variable | Meaning |
 |----------|---------|
 | `WORK_BASE` | `$HOME/inacawo-iht` |
 | `SCRATCH` | `/scratch/$USER` |
 | `MODEL_BASE` | `$HOME/inacawo-src` |
-| `CAWO_HINDCAST_BASE` | `$SCRATCH/inacawo/cawo_hindcast` |
+| `COAWST_ENV` | `$DEPS_BASE/coawst.bash_env_intel.source_oneapi` (Intel toolchain; sourced only by WPS/run) |
+| `CAWO_HINDCAST_BASE` | `$SCRATCH/inacawo-iht` |
 | `LO` / `LO_USER` | deps code / `preprocess/LO_user` |
-| `LO_DATA` / `LO_OUTPUT` | `$SCRATCH/LO_{data,output}` |
-| `ROMS_FORCING`, `GRID_DATA`, `ERA5_BASE_DIR`, `GLORYS_BASE_DIR` | preprocess I/O |
+| `LO_DATA` / `LO_OUTPUT` | `$SCRATCH/inacawo-iht/preprocess/LO_{data,output}` |
+| `SCRATCH_PREPROCESS` | `$SCRATCH/inacawo-iht/preprocess` |
+| `ROMS_FORCING` | `$SCRATCH_PREPROCESS/roms_forcing` (per-user writable) |
+| `ERA5_BASE_DIR`, `GLORYS_BASE_DIR`, `WPS_RUN_DIR` | under `$SCRATCH_PREPROCESS` |
 
-Shared site statics (WPS/WRF geog) default under `/scratch/cawohdcst_ft/...` and can be overridden:
+Shared site inputs default to **`/scratch/cawohdcst_ft/data`** (`SHARED_DATA` — also mirrored under `cawohdcst`). Override if needed:
 
 ```bash
+export SHARED_DATA=/scratch/cawohdcst_ft/data   # default
+# or individually:
 export WPS_STATIC_DIR=/path/to/wps_static
 export WRF_STATIC_DIR=/path/to/wrf_static
+export GRID_DATA=/path/to/grids
+export SWAN_STATIC=/path/to/swan_static_cycle
 ```
 
+| Shared var | Default under `$SHARED_DATA` |
+|------------|------------------------------|
+| `WPS_STATIC_DIR` | `static/wps/wps-4.3.1_static` |
+| `WRF_*` | `static/wrf/...` |
+| `GEOGRID_FILE` | `wps_run/geogrid_v43/geo_em.d01.nc.ID03F3` |
+| `GRID_DATA` | `grids` |
+| `SWAN_STATIC` / `VARINFO` / `GRID_SCRIP` | `cawo_hindcast_run/...` |
 ## Directory layout
 
 ```
@@ -140,7 +149,7 @@ sbatch slurm_run_post_wrf3d.bash
 | Code (`lo_tools`) | `$HOME/inacawo-deps/LO` via `hindcast.yml` |
 | User config / drivers | `preprocess/LO_user/` |
 | Wrappers | `preprocess/get_roms_icbc/` |
-| Data / output | `/scratch/$USER/LO_data`, `/scratch/$USER/LO_output` |
+| Data / output | `/scratch/$USER/inacawo-iht/preprocess/LO_{data,output}` |
 
 ## Notes
 

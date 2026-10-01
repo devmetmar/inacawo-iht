@@ -53,7 +53,7 @@ ds_clm = xr.open_dataset(os.path.join(template_folder, "ocean_clm.nc"))
 ds_bry = xr.open_dataset(os.path.join(template_folder, "ocean_bry.nc"))
 
 # Load Mercator mean seal level
-ds_msl = xr.open_dataset('/scratch/' + os.environ.get('USER', 'USER') + '/data/grids/mercator_msl.nc')
+ds_msl = xr.open_dataset(grid_folder + 'mercator_msl.nc')
 print('read msl')
 
 # Output folder

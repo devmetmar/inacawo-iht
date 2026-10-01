@@ -1,60 +1,52 @@
 #!/bin/bash
 # Portable InaCAWO hindcast environment — no hardcoded username.
-# Source from any machine after cloning inacawo-* under $HOME:
+# Shared LO / CAWO_HINDCAST_BASE / conda paths come from inacawo-deps/env.
+# This file adds iht workflow paths only.
 #   source $HOME/inacawo-iht/env
 #
+_IHT_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+_DEPS_ENV="${DEPS_BASE:-${HOME}/inacawo-deps}/env"
+if [[ ! -f "${_DEPS_ENV}" ]]; then
+  echo "ERROR: deps path SST not found: ${_DEPS_ENV}" >&2
+  echo "       clone inacawo-deps under \$HOME (or set DEPS_BASE)." >&2
+  return 1 2>/dev/null || exit 1
+fi
+# shellcheck disable=SC1090
+source "${_DEPS_ENV}"
+
 # -----------------
-# User / scratch roots
+# Working directory (iht-owned)
 # -----------------
-export HOME_DIR="${HOME}"
-export USER_NAME="${USER}"
-export SCRATCH="/scratch/${USER}"
-#
-# -----------------
-# Working directory
-# -----------------
-export WORK_BASE="${HOME}/inacawo-iht"
-export CAWO_HINDCAST_BASE="${SCRATCH}/inacawo/cawo_hindcast"
+export WORK_BASE="${_IHT_ENV_DIR}"
 export MODEL_BASE="${HOME}/inacawo-src"
-export CONDA_BASE="${HOME}/opt/miniforge3"
-#
-# LiveOcean — code in deps; user overrides under preprocess/ (ROMS IC/BC forcing)
-export LO="${HOME}/inacawo-deps/LO"
-export LO_USER="${HOME}/inacawo-iht/preprocess/LO_user"
-export LO_DATA="${SCRATCH}/LO_data"
-export LO_OUTPUT="${SCRATCH}/LO_output"
-#
-# ----------------
-# Lib dependencies
-# ----------------
-export LIBDEP="${HOME}/inacawo-deps/apps/cawo_depends/intel_2021.5.1/build/lib"
-export COAWST_ENV="${HOME}/inacawo-iht/coawst.bash_env_intel.source_oneapi"
+# LO_USER / LO_* / CAWO_HINDCAST_BASE / CONDA_BASE / LIBDEP / COAWST_ENV: from deps env
 # --------------------
-# Global Data Download
+# Preprocess I/O (scratch) — downloads + WPS/SWAN + LO under SCRATCH_PREPROCESS
 # --------------------
-export CAWO_INPUT="${CAWO_HINDCAST_BASE}/cawo_input"
-# --------------
-# Preprocessing
-# --------------
-export WPS_RUN_DIR="${CAWO_INPUT}/wps_run"
-# Shared site static inputs (not user-specific). Override if your site differs.
-export WPS_STATIC_DIR="${WPS_STATIC_DIR:-/scratch/cawohdcst_ft/data/static/wps/wps-4.3.1_static}"
-export WRF_DIR="${WRF_DIR:-/scratch/cawohdcst_ft/data/static/wrf}"
+export WPS_RUN_DIR="${SCRATCH_PREPROCESS}/wps_run"
+#
+# Shared site inputs (read-only for most users). Canonical share is cawohdcst_ft
+# (also present under cawohdcst). Override SHARED_DATA if your site differs.
+export SHARED_DATA="${SHARED_DATA:-/scratch/cawohdcst_ft/data}"
+export WPS_STATIC_DIR="${WPS_STATIC_DIR:-${SHARED_DATA}/static/wps/wps-4.3.1_static}"
+export WRF_DIR="${WRF_DIR:-${SHARED_DATA}/static/wrf}"
 export WRF_STATIC_DIR="${WRF_STATIC_DIR:-${WRF_DIR}/wrf-4.3.1_static}"
 export WRF_STATIC_EXTRA_DIR="${WRF_STATIC_EXTRA_DIR:-${WRF_DIR}/extra_static}"
-export GEOGRID_FILE="${GEOGRID_FILE:-/scratch/cawohdcst_ft/data/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3}"
-export GRID_DATA="${SCRATCH}/data/grids"
-export ERA5_BASE_DIR="${CAWO_INPUT}/era5"
-export GLORYS_BASE_DIR="${CAWO_INPUT}/mercator"
-export ROMS_FORCING="${SCRATCH}/data/roms_forcing"
+export GEOGRID_FILE="${GEOGRID_FILE:-${SHARED_DATA}/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3}"
+export GRID_DATA="${GRID_DATA:-${SHARED_DATA}/grids}"
+# Per-user writable under preprocess/
+export ERA5_BASE_DIR="${SCRATCH_PREPROCESS}/era5"
+export GLORYS_BASE_DIR="${SCRATCH_PREPROCESS}/mercator"
+export ROMS_FORCING="${ROMS_FORCING:-${SCRATCH_PREPROCESS}/roms_forcing}"
 #
 # -----------------
 # Model integration
 # -----------------
 export CAWO_HINDCAST_RUN="${CAWO_HINDCAST_BASE}/cawo_hindcast_run"
-export SWAN_STATIC="${SCRATCH}/data/cawo_hindcast_run/test_runs/cycle_2024061018_v5"
-export VARINFO="${SWAN_STATIC}"
-export GRID_SCRIP="${SCRATCH}/data/cawo_hindcast_run"
+export SWAN_STATIC="${SWAN_STATIC:-${SHARED_DATA}/cawo_hindcast_run/test_runs/cycle_2024061018_v5}"
+export VARINFO="${VARINFO:-${SWAN_STATIC}}"
+export GRID_SCRIP="${GRID_SCRIP:-${SHARED_DATA}/cawo_hindcast_run}"
 export IN_TEMPLATES="${WORK_BASE}/hindcast_run/in_templates"
 # --------------
 # Postprocessing

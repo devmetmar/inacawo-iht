@@ -42,7 +42,7 @@ while current_date <= end_date:
     day2_times = [f"{hour:02d}:00" for hour in range(0, 14)]      # 00:00 to 13:00
 
     # Create output directory
-    folder_name = f"{os.environ.get('CAWO_INPUT')}/era5_waves/era5_{current_date.strftime('%Y%m%d')}"
+    folder_name = f"{os.environ.get('SCRATCH_PREPROCESS')}/era5_waves/era5_{current_date.strftime('%Y%m%d')}"
     os.makedirs(folder_name, exist_ok=True)
 
     # Download for current day (12:00â€“23:00)

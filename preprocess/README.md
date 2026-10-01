@@ -16,4 +16,4 @@ Bootstrap before any job:
 source $HOME/inacawo-iht/setup_env.bash   # loads env + conda activate hindcast
 ```
 
-`LO_user/get_lo_info.py` uses portable paths (`$HOME/inacawo-deps/LO`, `/scratch/$USER/LO_*`).
+`LO_user/get_lo_info.py` uses portable paths (`$HOME/inacawo-deps/LO`, `/scratch/$USER/inacawo-iht/preprocess/LO_*`).

@@ -4,8 +4,8 @@ Path structure for LiveOcean used by get_roms_icbc utils.
 Same portable layout as preprocess/LO_user/get_lo_info.py:
   $HOME/inacawo-deps/LO
   $HOME/inacawo-iht/preprocess/LO_user
-  /scratch/$USER/LO_data
-  /scratch/$USER/LO_output
+  /scratch/$USER/inacawo-iht/preprocess/LO_data
+  /scratch/$USER/inacawo-iht/preprocess/LO_output
 """
 import os
 from pathlib import Path
@@ -13,17 +13,18 @@ from pathlib import Path
 HOME = Path.home()
 USER = os.environ.get('USER') or HOME.name
 SCRATCH = Path('/scratch') / USER
+SCRATCH_PREPROCESS = SCRATCH / 'inacawo-iht' / 'preprocess'
 
 LO = Path(os.environ.get('LO', HOME / 'inacawo-deps' / 'LO'))
 LOu = Path(os.environ.get('LO_USER', HOME / 'inacawo-iht' / 'preprocess' / 'LO_user'))
-data = Path(os.environ.get('LO_DATA', SCRATCH / 'LO_data'))
-LOo = Path(os.environ.get('LO_OUTPUT', SCRATCH / 'LO_output'))
+data = Path(os.environ.get('LO_DATA', SCRATCH_PREPROCESS / 'LO_data'))
+LOo = Path(os.environ.get('LO_OUTPUT', SCRATCH_PREPROCESS / 'LO_output'))
 parent = HOME
 
 roms_code = parent / 'LiveOcean_roms'
 traps_name = 'traps00'
 
-roms_out = SCRATCH / 'LO_roms'
+roms_out = Path(os.environ.get('LO_ROMS', SCRATCH_PREPROCESS / 'LO_roms'))
 roms_out1 = parent / 'BLANK'
 roms_out2 = parent / 'BLANK'
 roms_out3 = parent / 'BLANK'

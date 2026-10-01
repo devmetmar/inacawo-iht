@@ -49,7 +49,7 @@ def build_fn_list_for_cawo(ds0_str, ds1_str, base_dir=None):
     if base_dir is None:
         base_dir = Path(os.environ.get(
             'CAWO_OUTPUT',
-            f"/scratch/{os.environ.get('USER')}/inacawo/cawo_hindcast/cawo_output",
+            Path('/scratch') / os.environ.get('USER', 'USER') / 'inacawo-iht' / 'cawo_output',
         ))
     d0 = datetime.strptime(ds0_str, "%Y.%m.%d")
     d1 = datetime.strptime(ds1_str, "%Y.%m.%d")
