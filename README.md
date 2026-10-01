@@ -48,10 +48,10 @@ Key variables (see `inacawo-deps/env` + `env`):
 | `COAWST_ENV` | `$DEPS_BASE/coawst.bash_env_intel.source_oneapi` (Intel toolchain; sourced only by WPS/run) |
 | `CAWO_HINDCAST_BASE` | `$SCRATCH/inacawo-iht` |
 | `LO` / `LO_USER` | deps code / `preprocess/LO_user` |
-| `LO_DATA` / `LO_OUTPUT` | `$SCRATCH/inacawo-iht/preprocess/LO_{data,output}` |
-| `SCRATCH_PREPROCESS` | `$SCRATCH/inacawo-iht/preprocess` |
-| `ROMS_FORCING` | `$SCRATCH_PREPROCESS/roms_forcing` (per-user writable) |
-| `ERA5_BASE_DIR`, `GLORYS_BASE_DIR`, `WPS_RUN_DIR` | under `$SCRATCH_PREPROCESS` |
+| `LO_DATA` / `LO_OUTPUT` | `$SCRATCH/inacawo-iht/cawo_input/LO_{data,output}` |
+| `CAWO_INPUT` | `$SCRATCH/inacawo-iht/cawo_input` |
+| `ROMS_FORCING` | `$CAWO_INPUT/roms_forcing` (per-user writable) |
+| `ERA5_BASE_DIR`, `GLORYS_BASE_DIR`, `WPS_RUN_DIR` | under `$CAWO_INPUT` |
 
 Shared site inputs default to **`/scratch/cawohdcst_ft/data`** (`SHARED_DATA` — also mirrored under `cawohdcst`). Override if needed:
 
@@ -149,7 +149,7 @@ sbatch slurm_run_post_wrf3d.bash
 | Code (`lo_tools`) | `$HOME/inacawo-deps/LO` via `hindcast.yml` |
 | User config / drivers | `preprocess/LO_user/` |
 | Wrappers | `preprocess/get_roms_icbc/` |
-| Data / output | `/scratch/$USER/inacawo-iht/preprocess/LO_{data,output}` |
+| Data / output | `/scratch/$USER/inacawo-iht/cawo_input/LO_{data,output}` |
 
 ## Notes
 

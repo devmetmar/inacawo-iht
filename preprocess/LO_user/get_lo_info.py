@@ -6,8 +6,8 @@ Ldir is filled here and extended by Lfun for each model run.
 Layout (portable — no hardcoded username):
   $HOME/inacawo-deps/LO                              code (conda editable lo_tools)
   $HOME/inacawo-iht/preprocess/LO_user               this file + user overrides
-  /scratch/$USER/inacawo-iht/preprocess/LO_data      static / input data
-  /scratch/$USER/inacawo-iht/preprocess/LO_output    forcing and LO runtime output
+  /scratch/$USER/inacawo-iht/cawo_input/LO_data      static / input data
+  /scratch/$USER/inacawo-iht/cawo_input/LO_output    forcing and LO runtime output
 """
 import os
 from pathlib import Path
@@ -15,13 +15,13 @@ from pathlib import Path
 HOME = Path.home()
 USER = os.environ.get('USER') or HOME.name
 SCRATCH = Path('/scratch') / USER
-SCRATCH_PREPROCESS = SCRATCH / 'inacawo-iht' / 'preprocess'
+CAWO_INPUT = SCRATCH / 'inacawo-iht' / 'cawo_input'
 
 # InaCAWO split layout — prefer env SST (setup_env.bash / inacawo-deps/env)
 LO = Path(os.environ.get('LO', HOME / 'inacawo-deps' / 'LO'))
 LOu = Path(os.environ.get('LO_USER', HOME / 'inacawo-iht' / 'preprocess' / 'LO_user'))
-data = Path(os.environ.get('LO_DATA', SCRATCH_PREPROCESS / 'LO_data'))
-LOo = Path(os.environ.get('LO_OUTPUT', SCRATCH_PREPROCESS / 'LO_output'))
+data = Path(os.environ.get('LO_DATA', CAWO_INPUT / 'LO_data'))
+LOo = Path(os.environ.get('LO_OUTPUT', CAWO_INPUT / 'LO_output'))
 
 # Generic parent used by some LO helpers (not used for data/output above)
 parent = HOME
@@ -30,7 +30,7 @@ parent = HOME
 roms_code = parent / 'LiveOcean_roms'
 traps_name = 'traps00'
 
-roms_out = Path(os.environ.get('LO_ROMS', SCRATCH_PREPROCESS / 'LO_roms'))
+roms_out = Path(os.environ.get('LO_ROMS', CAWO_INPUT / 'LO_roms'))
 roms_out1 = parent / 'BLANK'
 roms_out2 = parent / 'BLANK'
 roms_out3 = parent / 'BLANK'

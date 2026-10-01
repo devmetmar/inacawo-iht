@@ -20,11 +20,11 @@ source "${_DEPS_ENV}"
 # -----------------
 export WORK_BASE="${_IHT_ENV_DIR}"
 export MODEL_BASE="${HOME}/inacawo-src"
-# LO_USER / LO_* / CAWO_HINDCAST_BASE / CONDA_BASE / LIBDEP / COAWST_ENV: from deps env
+# LO_USER / LO_* / CAWO_* / CONDA_BASE / LIBDEP / COAWST_ENV: from deps env
 # --------------------
-# Preprocess I/O (scratch) — downloads + WPS/SWAN + LO under SCRATCH_PREPROCESS
+# Preprocess I/O (scratch) — under CAWO_INPUT (sibling of cawo_hindcast_run/…)
 # --------------------
-export WPS_RUN_DIR="${SCRATCH_PREPROCESS}/wps_run"
+export WPS_RUN_DIR="${CAWO_INPUT}/wps_run"
 #
 # Shared site inputs (read-only for most users). Canonical share is cawohdcst_ft
 # (also present under cawohdcst). Override SHARED_DATA if your site differs.
@@ -35,10 +35,10 @@ export WRF_STATIC_DIR="${WRF_STATIC_DIR:-${WRF_DIR}/wrf-4.3.1_static}"
 export WRF_STATIC_EXTRA_DIR="${WRF_STATIC_EXTRA_DIR:-${WRF_DIR}/extra_static}"
 export GEOGRID_FILE="${GEOGRID_FILE:-${SHARED_DATA}/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3}"
 export GRID_DATA="${GRID_DATA:-${SHARED_DATA}/grids}"
-# Per-user writable under preprocess/
-export ERA5_BASE_DIR="${SCRATCH_PREPROCESS}/era5"
-export GLORYS_BASE_DIR="${SCRATCH_PREPROCESS}/mercator"
-export ROMS_FORCING="${ROMS_FORCING:-${SCRATCH_PREPROCESS}/roms_forcing}"
+# Per-user writable under cawo_input/
+export ERA5_BASE_DIR="${CAWO_INPUT}/era5"
+export GLORYS_BASE_DIR="${CAWO_INPUT}/mercator"
+export ROMS_FORCING="${ROMS_FORCING:-${CAWO_INPUT}/roms_forcing}"
 #
 # -----------------
 # Model integration

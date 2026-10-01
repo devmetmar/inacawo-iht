@@ -6,10 +6,10 @@ from pathlib import Path
 
 def modify_dot_in_swan(start_date, end_date, day1=False):
     cawo_run = os.environ.get("CAWO_HINDCAST_RUN")
-    scratch_preprocess = os.environ.get("SCRATCH_PREPROCESS")
+    cawo_input = os.environ.get("CAWO_INPUT")
     in_templates = os.environ.get("IN_TEMPLATES")
 
-    if cawo_run is None or scratch_preprocess is None or in_templates is None:
+    if cawo_run is None or cawo_input is None or in_templates is None:
         raise EnvironmentError("Required environment variables are not set.")
 
     directory_prefix = f"{cawo_run}/f"
@@ -35,7 +35,7 @@ def modify_dot_in_swan(start_date, end_date, day1=False):
         content = content.replace("today", date_str)
         content = content.replace("tomorrow", next_date.strftime("%Y%m%d"))
         content = content.replace("yesterday", prev_date.strftime("%Y%m%d"))
-        content = content.replace("SCRATCH_PREPROCESS", scratch_preprocess)
+        content = content.replace("CAWO_INPUT", cawo_input)
 
         with open(dest_file, "w") as f:
             f.write(content)
