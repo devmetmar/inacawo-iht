@@ -1,0 +1,11 @@
+# Vault token for InaCAWO hindcast API secrets (cdsapi, copernicusmarine, …).
+#
+# Setup on a new machine / user:
+#   cp vault-token.example vault-token
+#   chmod 600 vault-token
+#   # replace the line below with a real token from the Vault admin
+#
+# `vault-token` is gitignored — do not commit real tokens.
+# `setup_env.bash` reads the first non-comment line from that file.
+#
+hvs.REPLACE_WITH_YOUR_VAULT_TOKEN

@@ -21,6 +21,17 @@ fi
 # shellcheck disable=SC1091
 source "${WORK_BASE}/env"
 
+# HashiCorp Vault → local API credentials (cdsapi, copernicusmarine, …)
+# Needs VAULT_TOKEN or $WORK_BASE/vault-token (see vault-token.example).
+# Set IHT_VAULT_SKIP=1 to disable.
+# shellcheck disable=SC1091
+if [[ -f "${WORK_BASE}/setup_vault.bash" ]]; then
+  source "${WORK_BASE}/setup_vault.bash" || {
+    echo "ERROR: Vault credential setup failed" >&2
+    return 1 2>/dev/null || exit 1
+  }
+fi
+
 if [[ -z "${CONDA_BASE:-}" || ! -f "${CONDA_BASE}/etc/profile.d/conda.sh" ]]; then
   echo "ERROR: CONDA_BASE is unset or invalid: '${CONDA_BASE:-}'" >&2
   return 1 2>/dev/null || exit 1

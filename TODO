@@ -15,8 +15,10 @@ Download and build all forcing under `$CAWO_INPUT` (`$SCRATCH/inacawo-iht/cawo_i
 
 ### Bootstrap / credentials
 - [ ] `setup_env.bash` loads; `hindcast` conda env active
-- [ ] `~/.cdsapirc` present (ERA5 / CDS)
-- [ ] `copernicusmarine login` done (GLORYS)
+- [ ] Vault token: `cp vault-token.example vault-token && chmod 600 vault-token` (paste real token)
+- [ ] Vault reachable (`VAULT_ADDR`, default `http://202.90.199.148:8200`)
+- [ ] `~/.cdsapirc` written from Vault `iht-hindcast/cdsapi` (or manual fallback)
+- [ ] Copernicus Marine creds from Vault `iht-hindcast/copernicusmarine` (or `copernicusmarine login`)
 - [ ] Shared statics reachable (`WPS_STATIC_DIR`, `WRF_*`, `GRID_DATA`, `SWAN_STATIC`)
 
 ### 1a. ERA5 (`preprocess/get_era5/`)

@@ -9,6 +9,9 @@ forecast_examples
 
 models/*
 analysis/*
+
+# Real Vault token (keep vault-token.example in git)
+/vault-token
 # LO_user runtime / local artefacts
 LOG/
 **/LOG/
