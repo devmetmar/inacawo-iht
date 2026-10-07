@@ -56,3 +56,55 @@ fi
 if [[ -n "${LO:-}" && -d "${LO}/lo_tools/lo_tools" ]]; then
   export LO_TOOLS_PKG="${LO}/lo_tools/lo_tools"
 fi
+
+# Default: compact path summary. Full list: IHT_SHOW_PATHS=1. Silence: IHT_QUIET=1.
+export VAULT_TOKEN_FILE="${VAULT_TOKEN_FILE:-${WORK_BASE}/vault-token}"
+export CDSAPI_RC="${CDSAPI_RC:-${HOME}/.cdsapirc}"
+export VAULT_ADDR="${VAULT_ADDR:-http://202.90.199.148:8200}"
+
+_iht_print_env_paths() {
+  [[ "${IHT_QUIET:-0}" == "1" ]] && return 0
+  local var val
+  _iht_path_line() {
+    var="$1"
+    val="${!var-}"
+    printf '  %-22s %s\n' "${var}" "${val:-(unset)}"
+  }
+  _iht_path_group() {
+    local title="$1"; shift
+    echo "  # ${title}"
+    for var in "$@"; do
+      _iht_path_line "${var}"
+    done
+  }
+
+  echo "[iht] env ready (hindcast)"
+  if [[ "${IHT_SHOW_PATHS:-0}" == "1" ]]; then
+    _iht_path_group "roots" \
+      WORK_BASE DEPS_BASE MODEL_BASE SCRATCH CONDA_BASE HINDCAST_ENV_PREFIX \
+      HINDCAST_SHARED_ENV LIBDEP COAWST_ENV
+    _iht_path_group "LiveOcean" \
+      LO LO_TOOLS_PKG LO_USER LO_DATA LO_OUTPUT LO_ROMS
+    _iht_path_group "CAWO scratch" \
+      CAWO_HINDCAST_BASE CAWO_INPUT CAWO_HINDCAST_RUN CAWO_OUTPUT CAWO_POST
+    _iht_path_group "preprocess" \
+      ERA5_BASE_DIR GLORYS_BASE_DIR WPS_RUN_DIR ROMS_FORCING
+    _iht_path_group "shared inputs" \
+      SHARED_DATA WPS_STATIC_DIR WRF_DIR WRF_STATIC_DIR WRF_STATIC_EXTRA_DIR \
+      GEOGRID_FILE GRID_DATA SWAN_STATIC VARINFO GRID_SCRIP IN_TEMPLATES
+    _iht_path_group "vault / credentials" \
+      VAULT_ADDR VAULT_TOKEN_FILE CDSAPI_RC
+  else
+    # Compact default (main workflow paths only)
+    _iht_path_group "repos" WORK_BASE DEPS_BASE MODEL_BASE
+    _iht_path_group "scratch" CAWO_INPUT CAWO_HINDCAST_RUN CAWO_OUTPUT CAWO_POST
+    _iht_path_group "preprocess" ERA5_BASE_DIR GLORYS_BASE_DIR WPS_RUN_DIR ROMS_FORCING
+    _iht_path_group "shared" SHARED_DATA GRID_DATA IN_TEMPLATES
+    _iht_path_group "vault" VAULT_ADDR VAULT_TOKEN_FILE CDSAPI_RC
+    echo "  # full list: IHT_SHOW_PATHS=1"
+  fi
+  unset -f _iht_path_line _iht_path_group
+}
+
+_iht_print_env_paths
+unset -f _iht_print_env_paths

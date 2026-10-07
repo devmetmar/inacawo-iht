@@ -30,7 +30,7 @@ _iht_vault_fail() {
     _iht_vault_err "$@"
     return 1
   fi
-  _iht_vault_warn "$@"
+  [[ "${IHT_VAULT_VERBOSE:-0}" == "1" ]] && _iht_vault_warn "$@"
   return 0
 }
 
@@ -145,7 +145,8 @@ _iht_vault_apply_cdsapi() {
   printf 'url: %s\nkey: %s\n' "${url}" "${key}" > "${tmp}"
   mv -f "${tmp}" "${rc}"
   chmod 600 "${rc}"
-  echo "[vault] wrote ${rc}"
+  [[ "${IHT_VAULT_VERBOSE:-0}" == "1" || "${IHT_SHOW_PATHS:-0}" == "1" ]] && \
+    echo "[vault] wrote ${rc}"
 }
 
 _iht_vault_apply_copernicusmarine() {
@@ -181,7 +182,8 @@ json.dump({
 ' "${user}" "${pass}" "${tmp}"
   mv -f "${tmp}" "${cred_file}"
   chmod 600 "${cred_file}"
-  echo "[vault] exported COPERNICUSMARINE_SERVICE_* and wrote ${cred_file}"
+  [[ "${IHT_VAULT_VERBOSE:-0}" == "1" || "${IHT_SHOW_PATHS:-0}" == "1" ]] && \
+    echo "[vault] exported COPERNICUSMARINE_SERVICE_* and wrote ${cred_file}"
 }
 
 iht_vault_setup_credentials() {
