@@ -93,10 +93,10 @@ _iht_print_env_paths() {
       SHARED_DATA WPS_STATIC_DIR WRF_DIR WRF_STATIC_DIR WRF_STATIC_EXTRA_DIR \
       GEOGRID_FILE GRID_DATA SWAN_STATIC VARINFO GRID_SCRIP IN_TEMPLATES
     _iht_path_group "vault / credentials" \
-      VAULT_ADDR VAULT_TOKEN_FILE CDSAPI_RC
+      VAULT_ADDR VAULT_TOKEN_FILE CDSAPI_RC IHT_LOG_DIR
   else
     # Compact default (main workflow paths only)
-    _iht_path_group "repos" WORK_BASE DEPS_BASE MODEL_BASE
+    _iht_path_group "repos" WORK_BASE DEPS_BASE MODEL_BASE IHT_LOG_DIR
     _iht_path_group "scratch" CAWO_INPUT CAWO_HINDCAST_RUN CAWO_OUTPUT CAWO_POST
     _iht_path_group "preprocess" ERA5_BASE_DIR GLORYS_BASE_DIR WPS_RUN_DIR ROMS_FORCING
     _iht_path_group "shared" SHARED_DATA GRID_DATA IN_TEMPLATES

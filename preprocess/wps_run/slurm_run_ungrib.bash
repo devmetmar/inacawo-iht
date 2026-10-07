@@ -20,9 +20,9 @@ fi
 
 source $COAWST_ENV
 
-# Loop range (format: YYYYMMDD)
-START_DATE=19950106
-END_DATE=19950106
+# Loop range (format: YYYYMMDD) — override via run_preprocess.bash / IHT_* env
+START_DATE="${IHT_START_DATE:-19950106}"
+END_DATE="${IHT_END_DATE:-19950106}"
 
 # Base directories
 STATIC_WPS_DIR=$WPS_STATIC_DIR

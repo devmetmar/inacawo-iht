@@ -5,13 +5,22 @@ Always start with:
 source $HOME/inacawo-iht/setup_env.bash
 cd $WORK_BASE
 ```
-Edit date ranges inside each SLURM / Python script before submitting.
 
 ---
 
 ## 1. Preprocess
 
-Download and build all forcing under `$CAWO_INPUT` (`$SCRATCH/inacawo-iht/cawo_input/`).
+Entrypoint: `preprocess/run_preprocess.bash` (dates via `--start`/`--end`, not by editing SLURM).
+
+```bash
+cd $WORK_BASE/preprocess
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD              # all
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
+./run_preprocess.bash --help
+```
 
 ### Bootstrap / credentials
 - [ ] `setup_env.bash` loads; `hindcast` conda env active
@@ -21,39 +30,15 @@ Download and build all forcing under `$CAWO_INPUT` (`$SCRATCH/inacawo-iht/cawo_i
 - [ ] Copernicus Marine creds from Vault `iht-hindcast/copernicusmarine` (or `copernicusmarine login`)
 - [ ] Shared statics reachable (`WPS_STATIC_DIR`, `WRF_*`, `GRID_DATA`, `SWAN_STATIC`)
 
-### 1a. ERA5 (`preprocess/get_era5/`)
-- [ ] Set date range in download scripts
-- [ ] Run surface: `python get_era5_surface_automate.py`
-- [ ] Run pressure levels: `python get_era5_pl_automate.py`
-- [ ] Run waves: `python get_era5_waves.py`
-- [ ] Verify outputs under `$ERA5_BASE_DIR`
-
-### 1b. GLORYS (`preprocess/get_glorys/`)
-- [ ] Set date range in download scripts
-- [ ] Run: `python get_glorys_reanalysis.py` (or interim variant)
-- [ ] Verify outputs under `$GLORYS_BASE_DIR`
-
-### 1c. WPS / WRF IC–LBC (`preprocess/wps_run/`) — needs ERA5
-- [ ] Set dates / array in SLURM scripts
-- [ ] Submit ungrib: `sbatch slurm_run_ungrib.bash`
-- [ ] Check ungrib finished OK
-- [ ] Submit metgrid: `sbatch slurm_run_metgrid.bash`
-- [ ] Check metgrid finished OK
-- [ ] Submit real: `sbatch slurm_run_real.bash`
-- [ ] Verify met_em / wrfinput / wrfbdy under `$WPS_RUN_DIR` / expected paths
-
-### 1d. SWAN boundary (`preprocess/get_swan_bry/`) — needs ERA5 waves
-- [ ] Set dates in `slurm_make_swan_bc.bash`
-- [ ] Submit: `sbatch slurm_make_swan_bc.bash`
-- [ ] Verify TPAR / BC files for target days
-
-### 1e. ROMS IC/BC (`preprocess/get_roms_icbc/`) — needs GLORYS + `GRID_DATA`
-- [ ] Confirm `LO` / `LO_USER` / `LO_DATA` / `LO_OUTPUT` / `ROMS_FORCING`
-- [ ] Day 1 — ocnA0: `sbatch slurm_run_ocnA0_day1.bash`
-- [ ] Day 1 — ocnGcawo: `sbatch slurm_run_ocnGcawo_day1.bash`
-- [ ] Continuing days — ocnA0: `sbatch slurm_run_ocnA0_par.bash`
-- [ ] Continuing days — ocnGcawo: `sbatch slurm_run_ocnGcawo_par.bash`
-- [ ] Verify forcing under `$ROMS_FORCING` for each `fYYYYMMDD`
+### Via entrypoint
+- [ ] Download: `./run_preprocess.bash --start … --end … --stage download` (or `--model era5-sfc|era5-pl|era5-waves|glorys`)
+- [ ] Verify ERA5 under `$ERA5_BASE_DIR`, GLORYS under `$GLORYS_BASE_DIR`
+- [ ] WPS: `./run_preprocess.bash … --stage wps` (ungrib→metgrid→real via sbatch deps)
+- [ ] Verify met_em / wrfinput / wrfbdy under `$WPS_RUN_DIR`
+- [ ] SWAN: `./run_preprocess.bash … --stage swan` (needs ERA5 waves)
+- [ ] ROMS day1: `./run_preprocess.bash … --stage roms --day1`
+- [ ] ROMS continuing: `./run_preprocess.bash … --stage roms`
+- [ ] Verify forcing under `$ROMS_FORCING`
 
 ### Preprocess gate
 - [ ] ERA5, GLORYS, WPS/real, SWAN BCs, ROMS forcing all present for the run window

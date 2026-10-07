@@ -21,10 +21,10 @@ else
 fi
 
 # =========================
-# DATE RANGE
+# DATE RANGE (IHT_* from run_preprocess.bash)
 # =========================
-start_date="1995-01-06"
-end_date="1995-01-06"
+start_date="${IHT_START_DATE_ISO:-1995-01-06}"
+end_date="${IHT_END_DATE_ISO:-1995-01-06}"
 current_date="$start_date"
 MAX_PARALLEL=16   # limit parallel processes
 job_count=0

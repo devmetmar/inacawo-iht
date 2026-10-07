@@ -21,7 +21,8 @@ else
 fi
 
 # =========================
-# INIT DAY (new)
+# INIT DAY (new) — date from IHT_* (run_preprocess.bash) or fallback
 # =========================
-echo "Running initialization day"
-python driver_forcing3.py -g cawo -0 "1995.01.01" -s "new" -f ocnA0
+INIT_DOT="${IHT_START_DATE_DOT:-1995.01.01}"
+echo "Running initialization day ${INIT_DOT}"
+python driver_forcing3.py -g cawo -0 "${INIT_DOT}" -s "new" -f ocnA0

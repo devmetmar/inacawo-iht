@@ -53,3 +53,7 @@ export IN_TEMPLATES="${WORK_BASE}/hindcast_run/in_templates"
 # --------------
 export CAWO_OUTPUT="${CAWO_HINDCAST_BASE}/cawo_output"
 export CAWO_POST="${CAWO_HINDCAST_BASE}/cawo_post"
+# --------------
+# Workflow logs (under iht repo — portable / reproducible)
+# --------------
+export IHT_LOG_DIR="${IHT_LOG_DIR:-${WORK_BASE}/logs}"

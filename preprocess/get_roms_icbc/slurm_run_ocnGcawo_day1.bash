@@ -21,8 +21,8 @@ else
   exit 1
 fi
 
-RUN_DATE="1995-01-01"
-
+# Date from run_preprocess.bash (IHT_*) or fallback
+RUN_DATE="${IHT_START_DATE_ISO:-1995-01-01}"
 RUN_DATE=$(date -d "${RUN_DATE}" +%Y-%m-%d)
 
-python -u make_forcing_glorys_linear.py $RUN_DATE
+python -u make_forcing_glorys_linear.py "$RUN_DATE"

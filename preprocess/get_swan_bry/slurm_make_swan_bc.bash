@@ -19,5 +19,7 @@ else
   exit 1
 fi
 
-# Run the Python scrip
-python make_swan_bc.py 19950106 19950106
+# Dates from run_preprocess.bash (IHT_*) or fallback
+START_DATE="${IHT_START_DATE:-19950106}"
+END_DATE="${IHT_END_DATE:-19950106}"
+python make_swan_bc.py "${START_DATE}" "${END_DATE}"

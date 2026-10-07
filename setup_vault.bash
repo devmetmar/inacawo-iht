@@ -14,13 +14,16 @@
 #   IHT_VAULT_PREFIX    default iht-hindcast
 #   IHT_VAULT_SKIP=1    skip Vault entirely
 #   IHT_VAULT_REQUIRED=1  treat Vault failures as fatal
-#   CDSAPI_RC           default ~/.cdsapirc
+#   IHT_VAULT_WRITE_CMEMS_FILE=1
+#                       also write ~/.copernicusmarine/.copernicusmarine-credentials
+#                       (OFF by default — prefer env-only so secrets are not on disk)
+#   CDSAPI_RC           default ~/.cdsapirc  (cdsapi requires a file; mode 600)
 #
 # Expected KV paths (mount/data/prefix/<name>):
 #   cdsapi              fields: url, key  -> writes $CDSAPI_RC
-#   copernicusmarine    fields: username|user, password|passwd
-#                       -> COPERNICUSMARINE_SERVICE_USERNAME / _PASSWORD
-#                          and ~/.copernicusmarine/.copernicusmarine-credentials
+#   cmems | copernicusmarine
+#                       fields: username|user, password|passwd|pass
+#                       -> COPERNICUSMARINE_SERVICE_USERNAME / _PASSWORD (env only)
 
 _iht_vault_warn() { echo "WARNING: [vault] $*" >&2; }
 _iht_vault_err()  { echo "ERROR: [vault] $*" >&2; }
@@ -150,40 +153,53 @@ _iht_vault_apply_cdsapi() {
 }
 
 _iht_vault_apply_copernicusmarine() {
-  local json user pass cred_dir cred_file tmp
-  json="$(_iht_vault_get_json copernicusmarine)" || return 1
+  local json user pass cred_dir cred_file tmp name
+  # Prefer site path `cmems`; keep `copernicusmarine` as alias.
+  json=""
+  for name in cmems copernicusmarine; do
+    if json="$(_iht_vault_get_json "${name}" 2>/dev/null)"; then
+      break
+    fi
+    json=""
+  done
+  [[ -n "${json}" ]] || return 1
   user="$(_iht_vault_json_field "${json}" username user USER USERNAME)" || {
-    _iht_vault_err "copernicusmarine secret missing username/user"
+    _iht_vault_err "cmems/copernicusmarine secret missing username/user"
     return 1
   }
   pass="$(_iht_vault_json_field "${json}" password passwd pass PASSWORD)" || {
-    _iht_vault_err "copernicusmarine secret missing password"
+    _iht_vault_err "cmems/copernicusmarine secret missing password/pass"
     return 1
   }
+  # Env-only by default (not written to disk). copernicusmarine honors these.
   export COPERNICUSMARINE_SERVICE_USERNAME="${user}"
   export COPERNICUSMARINE_SERVICE_PASSWORD="${pass}"
 
-  # Persist for CLI tools that read the credentials file (not env).
-  cred_dir="${HOME}/.copernicusmarine"
-  cred_file="${cred_dir}/.copernicusmarine-credentials"
-  mkdir -p "${cred_dir}"
-  chmod 700 "${cred_dir}"
-  tmp="$(mktemp "${TMPDIR:-/tmp}/cmems.XXXXXX")"
-  umask 077
-  # Minimal JSON accepted by recent copernicusmarine clients
-  local py=python3
-  command -v python3 >/dev/null 2>&1 || py=python
-  "${py}" -c '
+  if [[ "${IHT_VAULT_WRITE_CMEMS_FILE:-0}" == "1" ]]; then
+    # Opt-in only: persists secrets under $HOME (mode 600). Prefer env-only.
+    cred_dir="${HOME}/.copernicusmarine"
+    cred_file="${cred_dir}/.copernicusmarine-credentials"
+    mkdir -p "${cred_dir}"
+    chmod 700 "${cred_dir}"
+    tmp="$(mktemp "${TMPDIR:-/tmp}/cmems.XXXXXX")"
+    umask 077
+    local py=python3
+    command -v python3 >/dev/null 2>&1 || py=python
+    "${py}" -c '
 import json, sys
 json.dump({
     "username": sys.argv[1],
     "password": sys.argv[2],
 }, open(sys.argv[3], "w"), indent=2)
 ' "${user}" "${pass}" "${tmp}"
-  mv -f "${tmp}" "${cred_file}"
-  chmod 600 "${cred_file}"
-  [[ "${IHT_VAULT_VERBOSE:-0}" == "1" || "${IHT_SHOW_PATHS:-0}" == "1" ]] && \
-    echo "[vault] exported COPERNICUSMARINE_SERVICE_* and wrote ${cred_file}"
+    mv -f "${tmp}" "${cred_file}"
+    chmod 600 "${cred_file}"
+    [[ "${IHT_VAULT_VERBOSE:-0}" == "1" || "${IHT_SHOW_PATHS:-0}" == "1" ]] && \
+      echo "[vault] wrote ${cred_file} (IHT_VAULT_WRITE_CMEMS_FILE=1)"
+  else
+    [[ "${IHT_VAULT_VERBOSE:-0}" == "1" || "${IHT_SHOW_PATHS:-0}" == "1" ]] && \
+      echo "[vault] CMEMS via env COPERNICUSMARINE_SERVICE_* (no credential file)"
+  fi
 }
 
 iht_vault_setup_credentials() {
@@ -211,11 +227,11 @@ iht_vault_setup_credentials() {
     [[ "${IHT_VAULT_REQUIRED:-0}" == "1" ]] && return 1
   fi
 
-  # Optional until the secret exists in Vault (today only cdsapi is provisioned).
   if _iht_vault_apply_copernicusmarine 2>/dev/null; then
-    :
-  elif [[ "${IHT_VAULT_VERBOSE:-0}" == "1" ]]; then
-    _iht_vault_warn "copernicusmarine secret not applied (missing path or fields under ${IHT_VAULT_PREFIX:-iht-hindcast}/)"
+    ok=1
+  else
+    _iht_vault_fail "could not apply cmems/copernicusmarine credentials from Vault"
+    [[ "${IHT_VAULT_REQUIRED:-0}" == "1" ]] && return 1
   fi
 
   if [[ "${ok}" -eq 0 && "${IHT_VAULT_REQUIRED:-0}" == "1" ]]; then

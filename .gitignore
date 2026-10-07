@@ -12,6 +12,12 @@ analysis/*
 
 # Real Vault token (keep vault-token.example in git)
 /vault-token
+
+# Workflow logs under iht repo (keep directory layout)
+/logs/**
+!/logs/.gitkeep
+!/logs/preprocess/
+!/logs/preprocess/.gitkeep
 # LO_user runtime / local artefacts
 LOG/
 **/LOG/

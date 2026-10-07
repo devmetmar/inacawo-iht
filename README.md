@@ -29,7 +29,7 @@ bash $HOME/inacawo-deps/install_hindcast_env.bash
 #    # paste real token (single hvs.... line) into vault-token — gitignored
 #    source ./setup_env.bash
 #    # writes ~/.cdsapirc from secret/iht-hindcast/cdsapi
-#    # optional: secret/iht-hindcast/copernicusmarine → COPERNICUSMARINE_SERVICE_*
+#    # also: secret/iht-hindcast/cmems (user/pass) → COPERNICUSMARINE_SERVICE_*
 # Or manual fallback:
 #    ~/.cdsapirc  (ERA5 / CDS)
 #    copernicusmarine login  (GLORYS)
@@ -108,20 +108,14 @@ Use **`hindcast`** for all stages (download, LO forcing, postprocess). Edit date
 
 ### 1. Preprocess
 
+Preferred entrypoint (dates via CLI; see `preprocess/README.md`):
+
 ```bash
-cd preprocess/get_era5        # ERA5
-python get_era5_surface_automate.py   # (or site scripts)
-cd ../get_glorys              # GLORYS
-python get_glorys_reanalysis.py
-cd ../wps_run
-sbatch slurm_run_ungrib.bash && sbatch slurm_run_metgrid.bash && sbatch slurm_run_real.bash
-cd ../get_swan_bry
-sbatch slurm_make_swan_bc.bash
-cd ../get_roms_icbc           # LiveOcean ROMS IC/BC
-sbatch slurm_run_ocnA0_day1.bash      # day 1
-sbatch slurm_run_ocnGcawo_day1.bash
-sbatch slurm_run_ocnA0_par.bash       # continuing days
-sbatch slurm_run_ocnGcawo_par.bash
+cd preprocess
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
 ```
 
 LiveOcean paths come from `preprocess/LO_user/get_lo_info.py` (and `get_roms_icbc/utils/get_lo_info.py` for the local utils import).

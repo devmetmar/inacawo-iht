@@ -26,8 +26,9 @@ date
 
 source $COAWST_ENV
 
-START_DATE=19950106
-END_DATE=19950106
+# Override via run_preprocess.bash / IHT_* env
+START_DATE="${IHT_START_DATE:-19950106}"
+END_DATE="${IHT_END_DATE:-19950106}"
 
 # Directories
 STATIC_WRF_DIR=$WRF_STATIC_DIR

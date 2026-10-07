@@ -24,10 +24,10 @@ else
 fi
 
 ########################################
-# USER INPUT
+# DATE RANGE (IHT_* from run_preprocess.bash)
 ########################################
-START_DATE="1995-01-06"
-END_DATE="1995-01-06"    # inclusive
+START_DATE="${IHT_START_DATE_ISO:-1995-01-06}"
+END_DATE="${IHT_END_DATE_ISO:-1995-01-06}"    # inclusive
 ########################################
 
 TASK_ID=${SLURM_ARRAY_TASK_ID}
