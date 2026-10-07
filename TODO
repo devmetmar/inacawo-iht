@@ -1,0 +1,113 @@
+# Checklist — check and process
+
+Always start with:
+```bash
+source $HOME/inacawo-iht/setup_env.bash
+cd $WORK_BASE
+```
+Edit date ranges inside each SLURM / Python script before submitting.
+
+---
+
+## 1. Preprocess
+
+Download and build all forcing under `$CAWO_INPUT` (`$SCRATCH/inacawo-iht/cawo_input/`).
+
+### Bootstrap / credentials
+- [ ] `setup_env.bash` loads; `hindcast` conda env active
+- [ ] `~/.cdsapirc` present (ERA5 / CDS)
+- [ ] `copernicusmarine login` done (GLORYS)
+- [ ] Shared statics reachable (`WPS_STATIC_DIR`, `WRF_*`, `GRID_DATA`, `SWAN_STATIC`)
+
+### 1a. ERA5 (`preprocess/get_era5/`)
+- [ ] Set date range in download scripts
+- [ ] Run surface: `python get_era5_surface_automate.py`
+- [ ] Run pressure levels: `python get_era5_pl_automate.py`
+- [ ] Run waves: `python get_era5_waves.py`
+- [ ] Verify outputs under `$ERA5_BASE_DIR`
+
+### 1b. GLORYS (`preprocess/get_glorys/`)
+- [ ] Set date range in download scripts
+- [ ] Run: `python get_glorys_reanalysis.py` (or interim variant)
+- [ ] Verify outputs under `$GLORYS_BASE_DIR`
+
+### 1c. WPS / WRF IC–LBC (`preprocess/wps_run/`) — needs ERA5
+- [ ] Set dates / array in SLURM scripts
+- [ ] Submit ungrib: `sbatch slurm_run_ungrib.bash`
+- [ ] Check ungrib finished OK
+- [ ] Submit metgrid: `sbatch slurm_run_metgrid.bash`
+- [ ] Check metgrid finished OK
+- [ ] Submit real: `sbatch slurm_run_real.bash`
+- [ ] Verify met_em / wrfinput / wrfbdy under `$WPS_RUN_DIR` / expected paths
+
+### 1d. SWAN boundary (`preprocess/get_swan_bry/`) — needs ERA5 waves
+- [ ] Set dates in `slurm_make_swan_bc.bash`
+- [ ] Submit: `sbatch slurm_make_swan_bc.bash`
+- [ ] Verify TPAR / BC files for target days
+
+### 1e. ROMS IC/BC (`preprocess/get_roms_icbc/`) — needs GLORYS + `GRID_DATA`
+- [ ] Confirm `LO` / `LO_USER` / `LO_DATA` / `LO_OUTPUT` / `ROMS_FORCING`
+- [ ] Day 1 — ocnA0: `sbatch slurm_run_ocnA0_day1.bash`
+- [ ] Day 1 — ocnGcawo: `sbatch slurm_run_ocnGcawo_day1.bash`
+- [ ] Continuing days — ocnA0: `sbatch slurm_run_ocnA0_par.bash`
+- [ ] Continuing days — ocnGcawo: `sbatch slurm_run_ocnGcawo_par.bash`
+- [ ] Verify forcing under `$ROMS_FORCING` for each `fYYYYMMDD`
+
+### Preprocess gate
+- [ ] ERA5, GLORYS, WPS/real, SWAN BCs, ROMS forcing all present for the run window
+- [ ] No failed SLURM jobs / incomplete days left unresolved
+
+---
+
+## 2. Hindcast run
+
+Prepare daily COAWST dirs under `$CAWO_HINDCAST_RUN`, stage inputs, submit 3-way model.
+
+### Prerequisites
+- [ ] Preprocess gate passed for all target days
+- [ ] Model tree / binaries available at `$MODEL_BASE` (ramp + no-ramp as needed)
+- [ ] `$COAWST_ENV` valid for Intel/COAWST stack
+
+### Setup
+- [ ] `cd $WORK_BASE/hindcast_run`
+- [ ] Create day folders: `python create_folders.py`
+- [ ] Fill namelists — day 1: `python modify_dot_in.py --day1`
+- [ ] Fill namelists — later days: `python modify_dot_in.py`
+- [ ] Stage day-1 inputs: `bash copy_files_for_run_day1.bash`
+- [ ] Stage continuing-day inputs: `bash copy_files_for_run.bash`
+- [ ] Spot-check `fYYYYMMDD` dirs (namelists, links to WRF/ROMS/SWAN inputs)
+
+### Submit
+- [ ] Edit dates / job settings in `run_hindcast.bash` / SLURM template
+- [ ] Submit: `bash run_hindcast.bash`
+- [ ] Monitor SLURM jobs (`slurm_run_cawo_3way_hdcst.bash` template)
+- [ ] Confirm day-1 uses ramp-tides + `in_templates/day1/`
+- [ ] Confirm later days use no-ramp + default `in_templates/`
+
+### Hindcast gate
+- [ ] History / restart / logs OK under `$CAWO_OUTPUT` (and run dirs)
+- [ ] Failed days requeued or marked; no silent incomplete integrations
+
+---
+
+## 3. Postprocess
+
+Regrid history to CAWO LL0.25 (`xesmf`) → products under `$CAWO_POST`.
+
+### Prerequisites
+- [ ] Raw model output present under `$CAWO_OUTPUT`
+- [ ] `CAWO_POST` writable; `hindcast` env active
+
+### Submit (edit `START_DATE` / `END_DATE` / `#SBATCH --array` first)
+- [ ] ROMS 2-D: `sbatch slurm_run_post_roms2d.bash` → `$CAWO_POST/ocean2d/`
+- [ ] ROMS 3-D: `sbatch slurm_run_post_roms3d.bash` → `$CAWO_POST/ocean3d/`
+- [ ] WRF 2-D: `sbatch slurm_run_post_wrf2d.bash`
+- [ ] WRF 3-D: `sbatch slurm_run_post_wrf3d.bash`
+
+### Verify
+- [ ] Expected NetCDF products for each day/time in the window
+- [ ] Spot-check variables / grid / time metadata
+- [ ] No failed array tasks left
+
+### Postprocess gate
+- [ ] All required products (ocean2d/3d, wrf2d/3d) complete for the run window
