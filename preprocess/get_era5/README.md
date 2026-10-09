@@ -6,7 +6,8 @@ Download ERA5 fields for the CAWO domain via **cdsapi** (`hindcast` conda env).
 
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
-# ~/.cdsapirc must be configured
+# Personal ~/.cdsapirc — see ../../src/credentials/README.md
+#   source setup_env.bash --cds-key 'UID:KEY' ...
 ```
 
 ## Scripts

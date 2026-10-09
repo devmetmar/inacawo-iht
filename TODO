@@ -22,12 +22,11 @@ cd $WORK_BASE/preprocess
 ./run_preprocess.bash --help
 ```
 
-### Bootstrap / credentials
+### Bootstrap / credentials (per user — see src/credentials/README.md)
 - [ ] `setup_env.bash` loads; `hindcast` conda env active
-- [ ] Vault token: `cp vault-token.example vault-token && chmod 600 vault-token` (paste real token)
-- [ ] Vault reachable (`VAULT_ADDR`, default `http://202.90.199.148:8200`)
-- [ ] `~/.cdsapirc` written from Vault `iht-hindcast/cdsapi` (or manual fallback)
-- [ ] Copernicus Marine creds from Vault `iht-hindcast/copernicusmarine` (or `copernicusmarine login`)
+- [ ] Creds via CLI: `source setup_env.bash --cds-key 'UID:KEY' --cmems-user U --cmems-pass P`
+- [ ] Or replace auto-seeded dummies / `copernicusmarine login`
+- [ ] End of setup shows INFO ready (not DUMMY WARNING)
 - [ ] Shared statics reachable (`WPS_STATIC_DIR`, `WRF_*`, `GRID_DATA`, `SWAN_STATIC`)
 
 ### Via entrypoint

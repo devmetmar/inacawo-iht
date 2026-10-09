@@ -6,7 +6,8 @@ Download GLORYS ocean reanalysis via **copernicusmarine** (`hindcast` conda env)
 
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
-copernicusmarine login   # once per machine/user
+# personal CMEMS — see ../../src/credentials/README.md
+#   source setup_env.bash --cmems-user U --cmems-pass P
 ```
 
 ## Scripts

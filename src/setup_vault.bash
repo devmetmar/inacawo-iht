@@ -2,17 +2,19 @@
 # Fetch API credentials from HashiCorp Vault (KV v2) into local files / env.
 # Sourced from setup_env.bash — do not execute directly.
 #
-# Required (one of):
-#   export VAULT_TOKEN='hvs....'
-#   or put the token in $VAULT_TOKEN_FILE
-#     default: $WORK_BASE/vault-token  (copy from vault-token.example)
+# Called only from setup_env.bash (do not run this file alone).
+# DEFAULT for training / multi-user: OFF. Prefer manual / CLI creds
+# (see src/credentials/README.md). Enable only for operators:
+#   export IHT_VAULT_CREDS=1
+#   # plus VAULT_TOKEN or $WORK_BASE/src/credentials/vault-token
 #
 # Optional overrides:
+#   IHT_VAULT_CREDS=1   opt-in: pull cdsapi/cmems from Vault (default: skip)
 #   VAULT_ADDR          default http://202.90.199.148:8200
-#   VAULT_TOKEN_FILE    default ${WORK_BASE}/vault-token
+#   VAULT_TOKEN_FILE    default ${IHT_SRC_DIR}/credentials/vault-token
 #   IHT_VAULT_MOUNT     default secret
 #   IHT_VAULT_PREFIX    default iht-hindcast
-#   IHT_VAULT_SKIP=1    skip Vault entirely
+#   IHT_VAULT_SKIP=1    skip Vault entirely (even if IHT_VAULT_CREDS=1)
 #   IHT_VAULT_REQUIRED=1  treat Vault failures as fatal
 #   IHT_VAULT_WRITE_CMEMS_FILE=1
 #                       also write ~/.copernicusmarine/.copernicusmarine-credentials
@@ -41,7 +43,11 @@ _iht_vault_resolve_token() {
   if [[ -n "${VAULT_TOKEN:-}" ]]; then
     return 0
   fi
-  local token_file="${VAULT_TOKEN_FILE:-${WORK_BASE}/vault-token}"
+  local token_file="${VAULT_TOKEN_FILE:-${IHT_SRC_DIR:-${WORK_BASE}/src}/credentials/vault-token}"
+  # Backward-compatible fallback: old repo-root vault-token
+  if [[ ! -f "${token_file}" && -f "${WORK_BASE}/vault-token" ]]; then
+    token_file="${WORK_BASE}/vault-token"
+  fi
   if [[ -f "${token_file}" ]]; then
     # First non-empty, non-comment line; strip CR
     VAULT_TOKEN="$(
@@ -203,14 +209,18 @@ json.dump({
 }
 
 iht_vault_setup_credentials() {
+  # Manual per-user credentials are the default (training / multi-user).
+  if [[ "${IHT_VAULT_CREDS:-0}" != "1" ]]; then
+    return 0
+  fi
   if [[ "${IHT_VAULT_SKIP:-0}" == "1" ]]; then
     return 0
   fi
 
   if ! _iht_vault_resolve_token; then
     if [[ "${IHT_VAULT_REQUIRED:-0}" == "1" ]]; then
-      _iht_vault_err "VAULT_TOKEN unset and no token file at \${VAULT_TOKEN_FILE:-\$WORK_BASE/vault-token}"
-      _iht_vault_err "copy vault-token.example → vault-token and paste a real token"
+      _iht_vault_err "VAULT_TOKEN unset and no token file at \${VAULT_TOKEN_FILE:-\$WORK_BASE/src/credentials/vault-token}"
+      _iht_vault_err "cp src/credentials/vault-token.example src/credentials/vault-token && chmod 600 ..."
       return 1
     fi
     # Quiet skip when Vault is optional (compute nodes / offline).

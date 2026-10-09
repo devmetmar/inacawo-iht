@@ -23,16 +23,11 @@ git clone <inacawo-iht-url>   $HOME/inacawo-iht
 bash $HOME/inacawo-deps/install_hindcast_env.bash
 # optional: --force-recreate for a clean rebuild
 
-# 3) API credentials via HashiCorp Vault (preferred)
-#    cd $HOME/inacawo-iht
-#    cp vault-token.example vault-token && chmod 600 vault-token
-#    # paste real token (single hvs.... line) into vault-token — gitignored
-#    source ./setup_env.bash
-#    # writes ~/.cdsapirc from secret/iht-hindcast/cdsapi
-#    # also: secret/iht-hindcast/cmems (user/pass) → COPERNICUSMARINE_SERVICE_*
-# Or manual fallback:
-#    ~/.cdsapirc  (ERA5 / CDS)
-#    copernicusmarine login  (GLORYS)
+# 3) API credentials — one account per user (training / multi-user)
+#    source ./setup_env.bash \
+#      --cds-key 'UID:KEY' --cmems-user U --cmems-pass P
+#    # or edit dummies / copernicusmarine login — see src/credentials/README.md
+# Operators only: IHT_VAULT_CREDS=1 + src/credentials/vault-token
 ```
 
 ## Environment bootstrap
@@ -41,11 +36,15 @@ Every SLURM/interactive script should load:
 
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
+# optional:
+# source setup_env.bash --cds-key 'UID:KEY' --cmems-user U --cmems-pass P
 ```
 
-That sources `env` → `inacawo-deps/env` (shared `LO_*` / `CAWO_HINDCAST_BASE` / conda) then iht workflow paths, pulls credentials from Vault when `VAULT_TOKEN` or `$WORK_BASE/vault-token` is set, and `conda activate hindcast`.
+That sources `env` → `inacawo-deps/env`, then helpers under `src/` (`setup_vault.bash`,
+`setup_credentials.bash`), soft-checks credentials, and `conda activate hindcast`.
 
-Vault defaults: `VAULT_ADDR=http://202.90.199.148:8200`, KV path `secret/data/iht-hindcast/<name>`. Token file: `vault-token` (from `vault-token.example`). Set `IHT_VAULT_SKIP=1` on nodes that cannot reach Vault; `IHT_VAULT_REQUIRED=1` to fail hard if Vault is unavailable.
+**Credentials:** CLI args above, or personal files — see [src/credentials/README.md](src/credentials/README.md).  
+**Vault (opt-in):** `IHT_VAULT_CREDS=1` — see `src/setup_vault.bash`.
 
 Key variables (see `inacawo-deps/env` + `env`):
 

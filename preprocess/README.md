@@ -64,11 +64,18 @@ inacawo-iht/
 ## Bootstrap
 
 ```bash
-source $HOME/inacawo-iht/setup_env.bash   # paths + conda activate hindcast + Vault creds
+source $HOME/inacawo-iht/setup_env.bash   # paths + conda activate hindcast
 ```
 
-Requires API credentials (Vault via `vault-token`, or manual `~/.cdsapirc` /
-`copernicusmarine login`).
+Requires **personal** API credentials — see
+[`src/credentials/README.md`](../src/credentials/README.md):
+
+```bash
+source $HOME/inacawo-iht/setup_env.bash \
+  --cds-key 'UID:KEY' --cmems-user U --cmems-pass P
+```
+
+Vault pull is opt-in (`IHT_VAULT_CREDS=1`) for operators only.
 
 ## Typical order (manual, if not using the entrypoint)
 
