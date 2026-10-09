@@ -84,27 +84,48 @@ while [[ "$current_date" -le "$END_DATE" ]]; do
 
     chmod 777 METGRID.TBL
 
-    # Environment variables from original script
+    # MPI sizing from actual Slurm allocation (DEV1 may be 1 node)
+    NNODES="${SLURM_JOB_NUM_NODES:-4}"
+    PPN="${SLURM_NTASKS_PER_NODE:-32}"
+    NTASKS="${SLURM_NTASKS:-$((NNODES * PPN))}"
+
     ulimit -s 3200000
     ulimit -m unlimited
     ulimit -v unlimited
     ulimit -d unlimited
     export OMP_NUM_THREADS=1
-    export FI_PROVIDER=mlx
-    export I_MPI_OFI_PROVIDER=mlx
-    export I_MPI_FABRICS=shm:ofi
-    export I_MPI_SHM=clx_avx2
-    export I_MPI_HYDRA_IFACE=ib0
-    export I_MPI_HYDRA_PMI_CONNECT=alltoall
-    export FI_MLX_TLS="dc,dc_x,shm,self"
-    export I_MPI_HYDRA_BRANCH_COUNT=4
     export I_MPI_MALLOC=1
     export I_MPI_SHM_HEAP=1
     export KMP_AFFINITY=verbose
     export SLURM_CPU_BIND=NONE
 
-    # Run metgrid
-    time mpiexec.hydra -bootstrap slurm -n 128 -ppn 32 ./metgrid.exe
+    # HDCAST: InfiniBand/mlx. DEV1 (or single-node): TCP/shm — mlx/ib0 fails on DEV1.
+    if [[ "${IHT_SLURM_PARTITION:-HDCAST}" == "HDCAST" && "${NNODES}" -gt 1 ]]; then
+      export FI_PROVIDER=mlx
+      export I_MPI_OFI_PROVIDER=mlx
+      export I_MPI_FABRICS=shm:ofi
+      export I_MPI_SHM=clx_avx2
+      export I_MPI_HYDRA_IFACE=ib0
+      export I_MPI_HYDRA_PMI_CONNECT=alltoall
+      export FI_MLX_TLS="dc,dc_x,shm,self"
+      export I_MPI_HYDRA_BRANCH_COUNT=4
+    else
+      echo "[metgrid] DEV1/single-node MPI fabrics (tcp/shm); n=${NTASKS} ppn=${PPN} nodes=${NNODES}"
+      unset I_MPI_HYDRA_IFACE FI_MLX_TLS I_MPI_OFI_PROVIDER || true
+      export FI_PROVIDER=tcp
+      export I_MPI_FABRICS=shm:tcp
+      export I_MPI_FALLBACK=1
+    fi
+
+    # Run metgrid — fail the job if MPI or products fail
+    if ! time mpiexec.hydra -bootstrap slurm -n "${NTASKS}" -ppn "${PPN}" ./metgrid.exe; then
+      echo "ERROR: metgrid.exe failed for ${current_date}" >&2
+      exit 1
+    fi
+    if ! compgen -G "${METGRID_DIR}/met_em.d01*" >/dev/null; then
+      echo "ERROR: no met_em.d01* after metgrid for ${current_date}" >&2
+      exit 1
+    fi
 
     current_date=$(date -d "$current_date +1 day" +%Y%m%d)
 done

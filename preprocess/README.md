@@ -7,22 +7,31 @@ Download and build all forcing needed for a hindcast day. Code lives here under
 ## Entrypoint (preferred)
 
 ```bash
-source $HOME/inacawo-iht/setup_env.bash
-cd $WORK_BASE/preprocess
-
-./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD
+# From repo root or preprocess/ (root has a thin wrapper):
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --overwrite
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage swan
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
 ./run_preprocess.bash --help
 ```
 
-`run_preprocess.bash` sets `IHT_START_DATE` / `IHT_END_DATE` (and ISO/dot variants)
-and dispatches subdirectory scripts. Dates are **not** edited inside SLURM files for
-normal use. Use `--dry-run` to print commands; `--wait` to block until submitted
-jobs finish.
+`run_preprocess.bash` sources `setup_env.bash` itself, sets `IHT_START_DATE` /
+`IHT_END_DATE` (and ISO/dot variants), and dispatches subdirectory scripts. Dates
+are **not** edited inside SLURM files for normal use. Use `--dry-run` to print
+commands only.
+
+**SLURM stages (wps / swan / roms) wait by default:** jobs are submitted one step
+at a time (WPS: ungrib → metgrid → real), and each Slurm log is followed into the
+preprocess SST log until COMPLETED. Terminal still prints only the log realpath —
+monitor with `tail -f <logfile>`. Pass `--no-wait` to submit and exit (WPS then
+uses `afterok` dependencies).
+
+**Partition:** auto-selects `HDCAST` if your Slurm account is in that partition’s
+`AllowAccounts`; otherwise falls back to `DEV1` (avoids stuck `PENDING
+(PartitionConfig)`). Override with `--partition NAME` or `IHT_SLURM_PARTITION`.
 
 **Downloads — skip by default:** if expected outputs for `--start`..`--end` already
 exist and validate (NetCDF via `ncdump -h`; GRIB via `wgrib2`/`grib_ls` or GRIB

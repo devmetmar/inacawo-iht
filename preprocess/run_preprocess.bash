@@ -57,7 +57,9 @@ Options:
   --glorys-product NAME     reanalysis (default) | interim
   --overwrite               Re-download even if outputs already exist and validate
   --dry-run                 Print commands only
-  --wait                    After sbatch, wait until jobs finish
+  --wait                    Wait for SLURM jobs (default)
+  --no-wait                 Submit SLURM jobs and exit (WPS chained via afterok)
+  --partition NAME          Slurm partition (default: auto — HDCAST if allowed, else DEV1)
   --no-log                  Do not write $WORK_BASE/logs/ (default: auto-log)
   -v, --verbose             Also mirror log to this terminal (default: quiet)
   -h, --help                Show this help
@@ -66,6 +68,11 @@ Download behaviour:
   Default: skip a download step when all expected outputs for --start..--end
   already exist and validate (NetCDF via ncdump -h; GRIB via wgrib2/grib_ls
   or GRIB magic bytes). Pass --overwrite to force re-download.
+
+SLURM behaviour (wps / swan / roms):
+  Default: submit → wait → follow each job's Slurm log into the preprocess
+  SST log, sequentially (ungrib then metgrid then real for --stage wps).
+  Use --no-wait to fire-and-forget (WPS still uses afterok dependencies).
 
 Logs (default, under iht repo):
   $WORK_BASE/logs/preprocess/preprocess_<start>_<end>_<stage>_<timestamp>.log
@@ -91,7 +98,8 @@ DAY1=0
 GLORYS_PRODUCT="reanalysis"
 OVERWRITE=0
 DRY_RUN=0
-WAIT_JOBS=0
+WAIT_JOBS=1
+PARTITION_ARG=""
 NO_LOG=0
 VERBOSE=0
 
@@ -106,6 +114,8 @@ while [[ $# -gt 0 ]]; do
     --overwrite) OVERWRITE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --wait) WAIT_JOBS=1; shift ;;
+    --no-wait) WAIT_JOBS=0; shift ;;
+    --partition) PARTITION_ARG="${2:-}"; shift 2 ;;
     --no-log) NO_LOG=1; shift ;;
     -v|--verbose) VERBOSE=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -158,7 +168,12 @@ fi
 # ---------------------------------------------------------------------------
 IHT_PREPROCESS_LOG=""
 _CHILD_PID=""
+_TAIL_PID=""
 _SBATCH_JOBS=()
+declare -A _JOB_LOGS=()
+declare -A _JOB_LABELS=()
+declare -A _JOB_DONE=()
+_SBATCH_STEP_LABEL=""
 
 _iht_realpath_log() {
   local p="$1"
@@ -172,7 +187,16 @@ _iht_realpath_log() {
   fi
 }
 
+_iht_stop_tail() {
+  if [[ -n "${_TAIL_PID:-}" ]]; then
+    kill "${_TAIL_PID}" 2>/dev/null || true
+    wait "${_TAIL_PID}" 2>/dev/null || true
+    _TAIL_PID=""
+  fi
+}
+
 _iht_kill_children() {
+  _iht_stop_tail
   # Stop local foreground/background child (python downloads, etc.)
   if [[ -n "${_CHILD_PID:-}" ]] && kill -0 "${_CHILD_PID}" 2>/dev/null; then
     kill -TERM -"${_CHILD_PID}" 2>/dev/null || kill -TERM "${_CHILD_PID}" 2>/dev/null || true
@@ -350,15 +374,97 @@ fi
 
 export IHT_OVERWRITE="${OVERWRITE}"
 
+# ---------------------------------------------------------------------------
+# Slurm partition: HDCAST if user's account is allowed, else DEV1
+# Override: --partition NAME  or  IHT_SLURM_PARTITION=NAME
+# ---------------------------------------------------------------------------
+_iht_user_slurm_accounts() {
+  if command -v sacctmgr >/dev/null 2>&1; then
+    sacctmgr -n show associations where user="${USER}" format=Account -P 2>/dev/null \
+      | awk -F'|' 'NF && $1 != "" {print $1}' | sort -u
+  fi
+}
+
+_iht_partition_allow_accounts() {
+  local part="$1"
+  local line
+  line="$(scontrol show partition "${part}" -o 2>/dev/null || true)"
+  [[ -n "${line}" ]] || return 1
+  if [[ "${line}" =~ AllowAccounts=([^ ]+) ]]; then
+    echo "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  echo "ALL"
+}
+
+_iht_account_allowed_on_partition() {
+  local part="$1"
+  local allow a uacc
+  allow="$(_iht_partition_allow_accounts "${part}" || true)"
+  [[ -n "${allow}" ]] || return 1
+  [[ "${allow}" == "ALL" ]] && return 0
+  while IFS= read -r uacc; do
+    [[ -z "${uacc}" ]] && continue
+    IFS=',' read -r -a _allowed <<< "${allow}"
+    for a in "${_allowed[@]}"; do
+      [[ "${uacc}" == "${a}" ]] && return 0
+    done
+  done < <(_iht_user_slurm_accounts)
+  return 1
+}
+
+_PARTITION_SOURCE="auto"
+# Sets IHT_SLURM_PARTITION + _PARTITION_SOURCE (must not run in a subshell).
+_iht_resolve_slurm_partition() {
+  local preferred="${IHT_SLURM_PARTITION_PREFERRED:-HDCAST}"
+  local fallback="${IHT_SLURM_PARTITION_FALLBACK:-DEV1}"
+  # Explicit CLI / env wins
+  if [[ -n "${PARTITION_ARG}" ]]; then
+    _PARTITION_SOURCE="cli"
+    IHT_SLURM_PARTITION="${PARTITION_ARG}"
+  elif [[ -n "${IHT_SLURM_PARTITION:-}" ]]; then
+    _PARTITION_SOURCE="env"
+    # keep existing IHT_SLURM_PARTITION
+  else
+    _PARTITION_SOURCE="auto"
+    if command -v scontrol >/dev/null 2>&1 && _iht_account_allowed_on_partition "${preferred}"; then
+      IHT_SLURM_PARTITION="${preferred}"
+    else
+      IHT_SLURM_PARTITION="${fallback}"
+    fi
+  fi
+  export IHT_SLURM_PARTITION
+  # Also set SBATCH_* so nested/manual sbatch in the same env picks it up
+  export SBATCH_PARTITION="${IHT_SLURM_PARTITION}"
+}
+
+_iht_resolve_slurm_partition
+
 echo "[preprocess] ${IHT_START_DATE} → ${IHT_END_DATE} (${_DAYS} day(s))"
 echo "[preprocess] steps: ${_STEPS[*]}"
 [[ "${DAY1}" -eq 1 ]] && echo "[preprocess] ROMS mode: day1"
 [[ "${DRY_RUN}" -eq 1 ]] && echo "[preprocess] DRY-RUN"
+if [[ "${WAIT_JOBS}" -eq 1 ]]; then
+  echo "[preprocess] wait=ON (sequential Slurm monitor → SST log; use --no-wait to detach)"
+else
+  echo "[preprocess] wait=OFF (submit only; WPS uses afterok chain)"
+fi
 if [[ "${OVERWRITE}" -eq 1 ]]; then
   echo "[preprocess] overwrite=ON (force re-download)"
 else
   echo "[preprocess] overwrite=OFF (skip valid existing download outputs)"
 fi
+case "${_PARTITION_SOURCE}" in
+  cli) echo "[preprocess] partition=${IHT_SLURM_PARTITION} (--partition)" ;;
+  env) echo "[preprocess] partition=${IHT_SLURM_PARTITION} (IHT_SLURM_PARTITION)" ;;
+  *)
+    if [[ "${IHT_SLURM_PARTITION}" == "${IHT_SLURM_PARTITION_FALLBACK:-DEV1}" ]]; then
+      echo "[preprocess] partition=${IHT_SLURM_PARTITION} (auto: no Slurm account on HDCAST → fallback)"
+    else
+      echo "[preprocess] partition=${IHT_SLURM_PARTITION} (auto: account allowed on HDCAST)"
+    fi
+    ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Timing + download skip helpers
@@ -530,27 +636,181 @@ _skip_local() {
   _iht_record_time "${desc}" 0 "skipped"
 }
 
-# Submit sbatch; prints job id on stdout only. Extra sbatch args after script path.
+# Resolve expected Slurm stdout path from #SBATCH --output= (relative → script dir).
+_sbatch_resolve_log() {
+  local script="$1" jid="$2" script_dir="$3"
+  local out_pat
+  out_pat="$(grep -E '^#SBATCH[[:space:]]+--output=' "${script}" 2>/dev/null \
+    | head -n1 | sed -E 's/^#SBATCH[[:space:]]+--output=//' || true)"
+  if [[ -z "${out_pat}" ]]; then
+    echo "${script_dir}/slurm-${jid}.out"
+    return 0
+  fi
+  out_pat="${out_pat//%j/${jid}}"
+  out_pat="${out_pat//%J/${jid}}"
+  out_pat="${out_pat//%A/${jid}}"
+  if [[ "${out_pat}" != /* ]]; then
+    out_pat="${script_dir}/${out_pat}"
+  fi
+  echo "${out_pat}"
+}
+
+# Submit sbatch. Sets _LAST_SBATCH_JID (never call via $() — must not run in a subshell
+# or job metadata / scancel tracking is lost). Label via _SBATCH_STEP_LABEL.
+# Uses --chdir so relative #SBATCH --output lands under the script directory.
 
 _sbatch() {
   local script="$1"; shift
   local extra=("$@")
+  local script_dir label out jid
+  script_dir="$(cd "$(dirname "${script}")" && pwd)"
+  label="${_SBATCH_STEP_LABEL:-$(basename "${script}")}"
+  _LAST_SBATCH_JID=""
+
   local export_list="ALL,IHT_START_DATE=${IHT_START_DATE},IHT_END_DATE=${IHT_END_DATE}"
   export_list+=",IHT_START_DATE_ISO=${IHT_START_DATE_ISO},IHT_END_DATE_ISO=${IHT_END_DATE_ISO}"
   export_list+=",IHT_START_DATE_DOT=${IHT_START_DATE_DOT},IHT_END_DATE_DOT=${IHT_END_DATE_DOT}"
 
-  local cmd=(sbatch --export="${export_list}" "${extra[@]}" "${script}")
-  echo "[sbatch] ${cmd[*]}" >&2
+  local cmd=(sbatch --chdir="${script_dir}" --partition="${IHT_SLURM_PARTITION}" \
+    --export="${export_list}" "${extra[@]}" "${script}")
+  echo "[sbatch] ${cmd[*]}"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    echo "DRYRUN_JOBID"
+    # Unique dry-run ids so associative maps do not collide across steps
+    jid="DRYRUN_${label}_$$_${#_SBATCH_JOBS[@]}"
+    _SBATCH_JOBS+=("${jid}")
+    _JOB_LABELS["${jid}"]="${label}"
+    _JOB_LOGS["${jid}"]="${script_dir}/dry-run.log"
+    _LAST_SBATCH_JID="${jid}"
     return 0
   fi
-  local out jid
   out="$("${cmd[@]}")"
-  echo "${out}" >&2
+  echo "${out}"
   jid="$(echo "${out}" | awk '{print $NF}')"
   _SBATCH_JOBS+=("${jid}")
-  echo "${jid}"
+  _JOB_LABELS["${jid}"]="${label}"
+  _JOB_LOGS["${jid}"]="$(_sbatch_resolve_log "${script}" "${jid}" "${script_dir}")"
+  _LAST_SBATCH_JID="${jid}"
+  echo "[preprocess] ${label} submitted job=${jid}"
+  echo "[preprocess] ${label} slurm log → ${_JOB_LOGS[${jid}]}"
+}
+
+# Block until one Slurm job finishes; stream its log into the preprocess SST log.
+_wait_one_job() {
+  local jid="$1"
+  local label="${_JOB_LABELS[${jid}]:-${jid}}"
+  local logfile="${_JOB_LOGS[${jid}]:-}"
+  local t0 t1 state reason elapsed
+  local poll=15
+  local last_status=""
+
+  t0="$(date +%s)"
+  echo "[preprocess] === monitor ${label} job=${jid} ==="
+  [[ -n "${logfile}" ]] && echo "[preprocess] following → ${logfile}"
+
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    _iht_record_time "${label}" 0 "dry-run"
+    _JOB_DONE["${jid}"]=1
+    return 0
+  fi
+
+  while true; do
+    state="$(squeue -h -j "${jid}" -o '%T' 2>/dev/null | head -n1 | tr -d ' ' || true)"
+    if [[ -z "${state}" ]]; then
+      break
+    fi
+    case "${state}" in
+      PENDING)
+        reason="$(squeue -h -j "${jid}" -o '%r' 2>/dev/null | head -n1 || true)"
+        if [[ "${last_status}" != "PENDING:${reason}" ]]; then
+          echo "[preprocess] ${label} ${jid}: PENDING (${reason})"
+          last_status="PENDING:${reason}"
+        fi
+        ;;
+      RUNNING|COMPLETING|CONFIGURING|STAGE_OUT)
+        if [[ "${last_status}" != "RUNNING" ]]; then
+          echo "[preprocess] ${label} ${jid}: ${state}"
+          last_status="RUNNING"
+        fi
+        if [[ -n "${logfile}" && -z "${_TAIL_PID}" ]]; then
+          [[ -f "${logfile}" ]] || sleep 2
+          if [[ -f "${logfile}" ]]; then
+            echo "[preprocess] --- live ${logfile} ---"
+            tail -n +1 -F "${logfile}" 2>/dev/null &
+            _TAIL_PID=$!
+          fi
+        fi
+        ;;
+      FAILED|CANCELLED|TIMEOUT|NODE_FAIL|OUT_OF_MEMORY|PREEMPTED|BOOT_FAIL)
+        _iht_stop_tail
+        echo "ERROR: ${label} job ${jid} state=${state}" >&2
+        if [[ -n "${logfile}" && -f "${logfile}" ]]; then
+          echo "--- last 80 lines of ${logfile} ---"
+          tail -n 80 "${logfile}"
+        fi
+        return 1
+        ;;
+      *)
+        if [[ "${last_status}" != "${state}" ]]; then
+          echo "[preprocess] ${label} ${jid}: ${state}"
+          last_status="${state}"
+        fi
+        ;;
+    esac
+    sleep "${poll}"
+  done
+
+  _iht_stop_tail
+
+  if command -v sacct >/dev/null 2>&1; then
+    # Brief settle for accounting
+    sleep 2
+    state="$(sacct -n -X -j "${jid}" -o State --parsable2 2>/dev/null | head -n1 | tr -d ' ')"
+    case "${state}" in
+      COMPLETED|"") ;;
+      *)
+        echo "ERROR: ${label} job ${jid} sacct state=${state}" >&2
+        if [[ -n "${logfile}" && -f "${logfile}" ]]; then
+          echo "--- last 80 lines of ${logfile} ---"
+          tail -n 80 "${logfile}"
+        fi
+        return 1
+        ;;
+    esac
+  fi
+
+  if [[ -n "${logfile}" && -f "${logfile}" ]]; then
+    echo "[preprocess] --- ${label} finished; last 40 lines ---"
+    tail -n 40 "${logfile}"
+  fi
+
+  t1="$(date +%s)"
+  elapsed=$((t1 - t0))
+  _JOB_DONE["${jid}"]=1
+  _iht_record_time "${label}" "${elapsed}" "ok"
+  echo "[preprocess] ${label} job ${jid} COMPLETED ($(_iht_fmt_elapsed "${elapsed}"))"
+  return 0
+}
+
+# Submit then optionally wait (default). Relies on _sbatch setting _LAST_SBATCH_JID.
+_LAST_SBATCH_JID=""
+_sbatch_step() {
+  local label="$1"; shift
+  local script="$1"; shift
+  local extra=("$@")
+  local t0 t1
+  _SBATCH_STEP_LABEL="${label}"
+  t0="$(date +%s)"
+  _sbatch "${script}" "${extra[@]}"
+  if [[ -z "${_LAST_SBATCH_JID}" ]]; then
+    echo "ERROR: sbatch did not set job id for ${label}" >&2
+    exit 1
+  fi
+  if [[ "${WAIT_JOBS}" -eq 1 ]]; then
+    _wait_one_job "${_LAST_SBATCH_JID}" || exit 1
+  else
+    t1="$(date +%s)"
+    _iht_record_time "${label} (sbatch ${_LAST_SBATCH_JID})" "$((t1 - t0))" "submitted"
+  fi
 }
 
 _wait_jobs() {
@@ -560,40 +820,61 @@ _wait_jobs() {
   if [[ "${#_SBATCH_JOBS[@]}" -eq 0 ]]; then
     return 0
   fi
-  echo "[preprocess] waiting for jobs: ${_SBATCH_JOBS[*]}"
-  local jid state
+  local jid
   for jid in "${_SBATCH_JOBS[@]}"; do
-    while true; do
-      state="$(squeue -h -j "${jid}" -o '%T' 2>/dev/null || true)"
-      if [[ -z "${state}" ]]; then
-        # finished / unknown — check sacct if available
-        break
-      fi
-      case "${state}" in
-        COMPLETED|COMPLETING) break ;;
-        FAILED|CANCELLED|TIMEOUT|NODE_FAIL|OUT_OF_MEMORY|PREEMPTED)
-          echo "ERROR: job ${jid} ended with state ${state}" >&2
-          exit 1
-          ;;
-      esac
-      sleep 30
-    done
-    if command -v sacct >/dev/null 2>&1; then
-      state="$(sacct -n -X -j "${jid}" -o State --parsable2 2>/dev/null | head -n1 | tr -d ' ')"
-      case "${state}" in
-        COMPLETED|"") ;;
-        *)
-          echo "ERROR: job ${jid} sacct state=${state}" >&2
-          exit 1
-          ;;
-      esac
-    fi
-    echo "[preprocess] job ${jid} done"
+    [[ -n "${_JOB_DONE[${jid}]+x}" ]] && continue
+    _wait_one_job "${jid}" || exit 1
   done
 }
 
 # Track last WPS job for afterok chain within this invocation
 _LAST_WPS_DEP=""
+
+# DEV1: shrink multi-node IB jobs to 1 node (mlx/ib0 fails on DEV1).
+_iht_dev1_mpi_overrides() {
+  if [[ "${IHT_SLURM_PARTITION}" == "DEV1" ]]; then
+    echo --nodes=1 --ntasks-per-node=32
+  fi
+}
+
+# Verify WPS products exist for the date window (catches Slurm COMPLETED + silent fail).
+_iht_validate_wps_step() {
+  local step="$1"
+  local wps="${WPS_RUN_DIR:-}"
+  local d missing=0
+  [[ -n "${wps}" ]] || { echo "ERROR: WPS_RUN_DIR unset" >&2; return 1; }
+  [[ "${DRY_RUN}" -eq 1 ]] && return 0
+
+  while read -r d; do
+    case "${step}" in
+      ungrib)
+        if ! compgen -G "${wps}/era5_${d}/ungrib/FILE:*" >/dev/null; then
+          echo "ERROR: ungrib missing FILE:* for ${d} under ${wps}/era5_${d}/ungrib" >&2
+          missing=1
+        fi
+        ;;
+      metgrid)
+        if ! compgen -G "${wps}/era5_${d}/metgrid/met_em.d01*" >/dev/null; then
+          echo "ERROR: metgrid missing met_em.d01* for ${d}" >&2
+          missing=1
+        fi
+        ;;
+      real)
+        if [[ ! -f "${wps}/era5_${d}/real/wrfinput_d01" ]]; then
+          echo "ERROR: real missing wrfinput_d01 for ${d}" >&2
+          missing=1
+        fi
+        ;;
+    esac
+  done < <(_iht_each_day)
+
+  if [[ "${missing}" -ne 0 ]]; then
+    echo "ERROR: ${step} reported COMPLETED but required products are missing" >&2
+    return 1
+  fi
+  echo "[preprocess] ${step} products OK for ${IHT_START_DATE}..${IHT_END_DATE}"
+  return 0
+}
 
 _run_step() {
   local step="$1"
@@ -638,41 +919,40 @@ _run_step() {
         python "${gpy}" "${IHT_START_DATE}" "${IHT_END_DATE}"
       ;;
     ungrib)
-      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
-      jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_ungrib.bash")"
-      _LAST_WPS_DEP="${jid}"
-      t1="$(date +%s)"
-      _iht_record_time "ungrib (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      _sbatch_step "ungrib" "${_PRE_ROOT}/wps_run/slurm_run_ungrib.bash"
+      _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
+      _iht_validate_wps_step ungrib || exit 1
       ;;
     metgrid)
-      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
-      local dep=()
-      [[ -n "${_LAST_WPS_DEP}" ]] && dep=(--dependency="afterok:${_LAST_WPS_DEP}")
-      jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_metgrid.bash" "${dep[@]}")"
-      _LAST_WPS_DEP="${jid}"
-      t1="$(date +%s)"
-      _iht_record_time "metgrid (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      local dep=() extra=()
+      # afterok only when fire-and-forget; with --wait we run truly sequential
+      if [[ "${WAIT_JOBS}" -eq 0 && -n "${_LAST_WPS_DEP}" ]]; then
+        dep=(--dependency="afterok:${_LAST_WPS_DEP}")
+      fi
+      # shellcheck disable=SC2207
+      extra=( $(_iht_dev1_mpi_overrides) )
+      _sbatch_step "metgrid" "${_PRE_ROOT}/wps_run/slurm_run_metgrid.bash" "${dep[@]}" "${extra[@]}"
+      _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
+      _iht_validate_wps_step metgrid || exit 1
       ;;
     real)
-      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
-      local dep=()
-      [[ -n "${_LAST_WPS_DEP}" ]] && dep=(--dependency="afterok:${_LAST_WPS_DEP}")
-      jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_real.bash" "${dep[@]}")"
-      _LAST_WPS_DEP="${jid}"
-      t1="$(date +%s)"
-      _iht_record_time "real (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      local dep=() extra=()
+      if [[ "${WAIT_JOBS}" -eq 0 && -n "${_LAST_WPS_DEP}" ]]; then
+        dep=(--dependency="afterok:${_LAST_WPS_DEP}")
+      fi
+      # shellcheck disable=SC2207
+      extra=( $(_iht_dev1_mpi_overrides) )
+      _sbatch_step "real" "${_PRE_ROOT}/wps_run/slurm_run_real.bash" "${dep[@]}" "${extra[@]}"
+      _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
+      _iht_validate_wps_step real || exit 1
       ;;
     swan)
-      t0="$(date +%s)"
-      jid="$(_sbatch "${_PRE_ROOT}/get_swan_bry/slurm_make_swan_bc.bash")"
-      t1="$(date +%s)"
-      _iht_record_time "swan (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      _sbatch_step "swan" "${_PRE_ROOT}/get_swan_bry/slurm_make_swan_bc.bash"
       ;;
     roms-a0)
-      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       local script
       if [[ "${DAY1}" -eq 1 ]]; then
@@ -680,12 +960,9 @@ _run_step() {
       else
         script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_par.bash"
       fi
-      jid="$(_sbatch "${script}")"
-      t1="$(date +%s)"
-      _iht_record_time "roms-a0 (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      _sbatch_step "roms-a0" "${script}"
       ;;
     roms-gcawo)
-      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       local script extra=()
       if [[ "${DAY1}" -eq 1 ]]; then
@@ -695,9 +972,7 @@ _run_step() {
         # Override array length to match date window
         extra=(--array="0-${_ARRAY_MAX}%8")
       fi
-      jid="$(_sbatch "${script}" "${extra[@]}")"
-      t1="$(date +%s)"
-      _iht_record_time "roms-gcawo (sbatch ${jid})" "$((t1 - t0))" "submitted"
+      _sbatch_step "roms-gcawo" "${script}" "${extra[@]}"
       ;;
     *)
       echo "ERROR: unhandled step ${step}" >&2

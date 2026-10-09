@@ -61,15 +61,14 @@ while [[ "$current_date" -le "$END_DATE" ]]; do
           wrfinput_d01 wrfbdy_d01 wrfinput_d02 wrfbdy_d02 \
           wrfhtr* wrfrst* aux* finish*
 
-    # Link metgrid outputs
+    # Link metgrid outputs — missing products are fatal (do not silently "succeed")
     if compgen -G "$METGRID_DIR/met_em.d01*" > /dev/null; then
         for f in $METGRID_DIR/met_em.d01*; do
             ln -sf "$f" "$(basename "$f")"
         done
     else
-        echo "WARNING: No met_em.d01* files for $current_date, skipping."
-        current_date=$(date -d "$current_date +1 day" +%Y%m%d)
-        continue
+        echo "ERROR: No met_em.d01* files for $current_date (metgrid must succeed first)" >&2
+        exit 1
     fi
 
     # Prepare namelist.input
@@ -89,27 +88,43 @@ while [[ "$current_date" -le "$END_DATE" ]]; do
     sed -i "s/HH1/$BHH/g" namelist.input
     sed -i "s/HH2/$EHH/g" namelist.input
 
-    # MPI and environment settings
-    NUMP=512
-    NPER=32
+    # MPI sizing from actual Slurm allocation
+    NNODES="${SLURM_JOB_NUM_NODES:-16}"
+    NPER="${SLURM_NTASKS_PER_NODE:-32}"
+    NUMP="${SLURM_NTASKS:-$((NNODES * NPER))}"
     ulimit -c unlimited
     export OMP_NUM_THREADS=1
-    export FI_PROVIDER=mlx
-    export I_MPI_OFI_PROVIDER=mlx
-    export I_MPI_FABRICS=shm:ofi
-    export I_MPI_SHM=clx_avx2
-    export I_MPI_FALLBACK=0
-    export I_MPI_HYDRA_IFACE=ib0
-    export I_MPI_HYDRA_PMI_CONNECT=alltoall
-    export FI_MLX_TLS="dc,dc_x,shm,self"
-    export I_MPI_HYDRA_BRANCH_COUNT=4
     export I_MPI_MALLOC=1
     export I_MPI_SHM_HEAP=1
     export KMP_AFFINITY=verbose
     export SLURM_CPU_BIND=NONE
 
-    # Run real.exe
-    time mpiexec.hydra -bootstrap slurm -n $NUMP -ppn $NPER ./real.exe
+    if [[ "${IHT_SLURM_PARTITION:-HDCAST}" == "HDCAST" && "${NNODES}" -gt 1 ]]; then
+      export FI_PROVIDER=mlx
+      export I_MPI_OFI_PROVIDER=mlx
+      export I_MPI_FABRICS=shm:ofi
+      export I_MPI_SHM=clx_avx2
+      export I_MPI_FALLBACK=0
+      export I_MPI_HYDRA_IFACE=ib0
+      export I_MPI_HYDRA_PMI_CONNECT=alltoall
+      export FI_MLX_TLS="dc,dc_x,shm,self"
+      export I_MPI_HYDRA_BRANCH_COUNT=4
+    else
+      echo "[real] DEV1/single-node MPI fabrics (tcp/shm); n=${NUMP} ppn=${NPER} nodes=${NNODES}"
+      unset I_MPI_HYDRA_IFACE FI_MLX_TLS I_MPI_OFI_PROVIDER || true
+      export FI_PROVIDER=tcp
+      export I_MPI_FABRICS=shm:tcp
+      export I_MPI_FALLBACK=1
+    fi
+
+    if ! time mpiexec.hydra -bootstrap slurm -n "${NUMP}" -ppn "${NPER}" ./real.exe; then
+      echo "ERROR: real.exe failed for ${current_date}" >&2
+      exit 1
+    fi
+    if [[ ! -f wrfinput_d01 ]]; then
+      echo "ERROR: no wrfinput_d01 after real for ${current_date}" >&2
+      exit 1
+    fi
 
     current_date=$(date -d "$current_date +1 day" +%Y%m%d)
 done
