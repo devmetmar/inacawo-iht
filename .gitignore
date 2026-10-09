@@ -11,9 +11,7 @@ models/*
 analysis/*
 
 # Real Vault token (keep vault-token.example in git)
-/vault-token
 /src/credentials/vault-token
-/credentials/vault-token
 
 # Workflow logs under iht repo (keep directory layout)
 /logs/**
