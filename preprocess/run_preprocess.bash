@@ -55,16 +55,23 @@ Aliases:
 Options:
   --day1                    Use ROMS day-1 scripts (ocnA0/ocnGcawo day1)
   --glorys-product NAME     reanalysis (default) | interim
+  --overwrite               Re-download even if outputs already exist and validate
   --dry-run                 Print commands only
   --wait                    After sbatch, wait until jobs finish
   --no-log                  Do not write $WORK_BASE/logs/ (default: auto-log)
   -v, --verbose             Also mirror log to this terminal (default: quiet)
   -h, --help                Show this help
 
+Download behaviour:
+  Default: skip a download step when all expected outputs for --start..--end
+  already exist and validate (NetCDF via ncdump -h; GRIB via wgrib2/grib_ls
+  or GRIB magic bytes). Pass --overwrite to force re-download.
+
 Logs (default, under iht repo):
   $WORK_BASE/logs/preprocess/preprocess_<start>_<end>_<stage>_<timestamp>.log
   Terminal prints only the log realpath; monitor with: tail -f <logfile>
   Ctrl+C stops local children and scancels submitted SLURM jobs.
+  Each step logs elapsed time; a timing summary is printed at the end.
 
 Semantics:
   --stage download                  all downloads
@@ -82,6 +89,7 @@ STAGE="all"
 MODEL=""
 DAY1=0
 GLORYS_PRODUCT="reanalysis"
+OVERWRITE=0
 DRY_RUN=0
 WAIT_JOBS=0
 NO_LOG=0
@@ -95,6 +103,7 @@ while [[ $# -gt 0 ]]; do
     --model) MODEL="${2:-}"; shift 2 ;;
     --day1) DAY1=1; shift ;;
     --glorys-product) GLORYS_PRODUCT="${2:-}"; shift 2 ;;
+    --overwrite) OVERWRITE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --wait) WAIT_JOBS=1; shift ;;
     --no-log) NO_LOG=1; shift ;;
@@ -339,22 +348,165 @@ if [[ "${#_STEPS[@]}" -eq 0 ]]; then
   exit 2
 fi
 
+export IHT_OVERWRITE="${OVERWRITE}"
+
 echo "[preprocess] ${IHT_START_DATE} → ${IHT_END_DATE} (${_DAYS} day(s))"
 echo "[preprocess] steps: ${_STEPS[*]}"
 [[ "${DAY1}" -eq 1 ]] && echo "[preprocess] ROMS mode: day1"
 [[ "${DRY_RUN}" -eq 1 ]] && echo "[preprocess] DRY-RUN"
+if [[ "${OVERWRITE}" -eq 1 ]]; then
+  echo "[preprocess] overwrite=ON (force re-download)"
+else
+  echo "[preprocess] overwrite=OFF (skip valid existing download outputs)"
+fi
+
+# ---------------------------------------------------------------------------
+# Timing + download skip helpers
+# ---------------------------------------------------------------------------
+_STEP_TIMES=()   # "label|seconds|status"
+_RUN_T0="$(date +%s)"
+
+_iht_fmt_elapsed() {
+  local s="${1:-0}"
+  (( s < 0 )) && s=0
+  local h=$((s / 3600)) m=$(((s % 3600) / 60)) sec=$((s % 60))
+  if (( h > 0 )); then
+    printf '%dh%02dm%02ds' "${h}" "${m}" "${sec}"
+  else
+    printf '%dm%02ds' "${m}" "${sec}"
+  fi
+}
+
+_iht_file_valid() {
+  local f="$1"
+  [[ -f "${f}" && -s "${f}" ]] || return 1
+  case "${f}" in
+    *.nc|*.nc4)
+      if ! command -v ncdump >/dev/null 2>&1; then
+        echo "[warn] ncdump not found; cannot validate ${f}" >&2
+        return 1
+      fi
+      ncdump -h "${f}" >/dev/null 2>&1
+      ;;
+    *.grib|*.grb|*.grib2)
+      if command -v wgrib2 >/dev/null 2>&1; then
+        wgrib2 -s "${f}" >/dev/null 2>&1
+      elif command -v grib_ls >/dev/null 2>&1; then
+        grib_ls "${f}" >/dev/null 2>&1
+      else
+        # Fallback: GRIB magic + non-trivial size
+        local magic sz
+        magic="$(head -c 4 "${f}" 2>/dev/null || true)"
+        sz="$(stat -c%s "${f}" 2>/dev/null || echo 0)"
+        [[ "${magic}" == "GRIB" && "${sz}" -gt 1000 ]]
+      fi
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# List YYYYMMDD dates from START..END inclusive (stdout, one per line).
+_iht_each_day() {
+  local d="${IHT_START_DATE}"
+  while [[ "${d}" -le "${IHT_END_DATE}" ]]; do
+    echo "${d}"
+    d="$(date -d "${d:0:4}-${d:4:2}-${d:6:2} +1 day" +%Y%m%d)"
+  done
+}
+
+# Return 0 if all expected download outputs for step are present + valid.
+_iht_download_outputs_valid() {
+  local step="$1"
+  local d ymd iso base f1 f2
+  local cawo="${CAWO_INPUT:-}"
+  [[ -n "${cawo}" ]] || return 1
+
+  case "${step}" in
+    era5-sfc)
+      while read -r d; do
+        base="${cawo}/era5/era5_${d}"
+        f1="${base}/era5_surface_part1.grib"
+        f2="${base}/era5_surface_part2.grib"
+        _iht_file_valid "${f1}" || return 1
+        _iht_file_valid "${f2}" || return 1
+      done < <(_iht_each_day)
+      ;;
+    era5-pl)
+      while read -r d; do
+        base="${cawo}/era5/era5_${d}"
+        f1="${base}/era5_pl_part1.grib"
+        f2="${base}/era5_pl_part2.grib"
+        _iht_file_valid "${f1}" || return 1
+        _iht_file_valid "${f2}" || return 1
+      done < <(_iht_each_day)
+      ;;
+    era5-waves)
+      while read -r d; do
+        base="${cawo}/era5_waves/era5_${d}"
+        f1="${base}/era5_waves_part1.grib"
+        f2="${base}/era5_waves_part2.grib"
+        _iht_file_valid "${f1}" || return 1
+        _iht_file_valid "${f2}" || return 1
+      done < <(_iht_each_day)
+      ;;
+    glorys)
+      local gdir="${GLORYS_BASE_DIR:-${cawo}/mercator}"
+      # Download scripts write under CAWO_INPUT/mercator; prefer that if set.
+      [[ -d "${cawo}/mercator" ]] && gdir="${cawo}/mercator"
+      while read -r d; do
+        iso="$(date -d "${d:0:4}-${d:4:2}-${d:6:2}" +%Y-%m-%d)"
+        f1="${gdir}/GLORYS_Reanalysis_LO_${iso}T00:00:00.nc"
+        _iht_file_valid "${f1}" || return 1
+      done < <(_iht_each_day)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+_iht_is_download_step() {
+  case "$1" in
+    era5-sfc|era5-pl|era5-waves|glorys) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_iht_record_time() {
+  local label="$1" secs="$2" status="$3"
+  _STEP_TIMES+=("${label}|${secs}|${status}")
+  echo "[time] ${label}: $(_iht_fmt_elapsed "${secs}") (${status})" >&2
+}
+
+_iht_print_timing_summary() {
+  local total=$(( $(date +%s) - _RUN_T0 ))
+  local entry label secs status
+  echo "[preprocess] timing summary:"
+  for entry in "${_STEP_TIMES[@]:-}"; do
+    [[ -z "${entry}" ]] && continue
+    IFS='|' read -r label secs status <<< "${entry}"
+    printf '  %-28s  %10s  %s\n' "${label}" "$(_iht_fmt_elapsed "${secs}")" "${status}"
+  done
+  echo "  ----------------------------------------"
+  printf '  %-28s  %10s\n' "TOTAL" "$(_iht_fmt_elapsed "${total}")"
+}
 
 # ---------------------------------------------------------------------------
 # Run helpers
 # ---------------------------------------------------------------------------
 _run_local() {
   local desc="$1"; shift
-  local rc=0
+  local rc=0 t0 t1 elapsed
   echo "[run] ${desc}" >&2
   echo "      $*" >&2
   if [[ "${DRY_RUN}" -eq 1 ]]; then
+    _iht_record_time "${desc}" 0 "dry-run"
     return 0
   fi
+  t0="$(date +%s)"
   # New process group so Ctrl+C can kill the whole subtree (python, etc.)
   set -m
   "$@" &
@@ -362,7 +514,20 @@ _run_local() {
   set +m
   wait "${_CHILD_PID}" || rc=$?
   _CHILD_PID=""
+  t1="$(date +%s)"
+  elapsed=$((t1 - t0))
+  if [[ "${rc}" -eq 0 ]]; then
+    _iht_record_time "${desc}" "${elapsed}" "ok"
+  else
+    _iht_record_time "${desc}" "${elapsed}" "FAILED(rc=${rc})"
+  fi
   return "${rc}"
+}
+
+_skip_local() {
+  local desc="$1"
+  echo "[skip] ${desc} (outputs valid; pass --overwrite to re-download)" >&2
+  _iht_record_time "${desc}" 0 "skipped"
 }
 
 # Submit sbatch; prints job id on stdout only. Extra sbatch args after script path.
@@ -432,7 +597,22 @@ _LAST_WPS_DEP=""
 
 _run_step() {
   local step="$1"
-  local jid=""
+  local jid="" t0 t1
+
+  # Download steps: skip when outputs already valid (unless --overwrite)
+  if _iht_is_download_step "${step}"; then
+    local dlabel="${step}"
+    if [[ "${step}" == "glorys" ]]; then
+      dlabel="glorys (${GLORYS_PRODUCT})"
+    fi
+    if [[ "${OVERWRITE}" -eq 0 && "${DRY_RUN}" -eq 0 ]]; then
+      if _iht_download_outputs_valid "${step}"; then
+        _skip_local "${dlabel}"
+        return 0
+      fi
+    fi
+  fi
+
   case "${step}" in
     era5-sfc)
       _run_local "era5-sfc" \
@@ -458,28 +638,41 @@ _run_step() {
         python "${gpy}" "${IHT_START_DATE}" "${IHT_END_DATE}"
       ;;
     ungrib)
+      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
       jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_ungrib.bash")"
       _LAST_WPS_DEP="${jid}"
+      t1="$(date +%s)"
+      _iht_record_time "ungrib (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     metgrid)
+      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
       local dep=()
       [[ -n "${_LAST_WPS_DEP}" ]] && dep=(--dependency="afterok:${_LAST_WPS_DEP}")
       jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_metgrid.bash" "${dep[@]}")"
       _LAST_WPS_DEP="${jid}"
+      t1="$(date +%s)"
+      _iht_record_time "metgrid (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     real)
+      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/wps_run/log"
       local dep=()
       [[ -n "${_LAST_WPS_DEP}" ]] && dep=(--dependency="afterok:${_LAST_WPS_DEP}")
       jid="$(_sbatch "${_PRE_ROOT}/wps_run/slurm_run_real.bash" "${dep[@]}")"
       _LAST_WPS_DEP="${jid}"
+      t1="$(date +%s)"
+      _iht_record_time "real (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     swan)
+      t0="$(date +%s)"
       jid="$(_sbatch "${_PRE_ROOT}/get_swan_bry/slurm_make_swan_bc.bash")"
+      t1="$(date +%s)"
+      _iht_record_time "swan (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     roms-a0)
+      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       local script
       if [[ "${DAY1}" -eq 1 ]]; then
@@ -488,8 +681,11 @@ _run_step() {
         script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_par.bash"
       fi
       jid="$(_sbatch "${script}")"
+      t1="$(date +%s)"
+      _iht_record_time "roms-a0 (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     roms-gcawo)
+      t0="$(date +%s)"
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       local script extra=()
       if [[ "${DAY1}" -eq 1 ]]; then
@@ -500,6 +696,8 @@ _run_step() {
         extra=(--array="0-${_ARRAY_MAX}%8")
       fi
       jid="$(_sbatch "${script}" "${extra[@]}")"
+      t1="$(date +%s)"
+      _iht_record_time "roms-gcawo (sbatch ${jid})" "$((t1 - t0))" "submitted"
       ;;
     *)
       echo "ERROR: unhandled step ${step}" >&2
@@ -514,4 +712,5 @@ done
 
 _wait_jobs
 
+_iht_print_timing_summary
 echo "[preprocess] done"

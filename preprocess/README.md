@@ -13,6 +13,7 @@ cd $WORK_BASE/preprocess
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --overwrite
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
 ./run_preprocess.bash --help
@@ -22,6 +23,11 @@ cd $WORK_BASE/preprocess
 and dispatches subdirectory scripts. Dates are **not** edited inside SLURM files for
 normal use. Use `--dry-run` to print commands; `--wait` to block until submitted
 jobs finish.
+
+**Downloads — skip by default:** if expected outputs for `--start`..`--end` already
+exist and validate (NetCDF via `ncdump -h`; GRIB via `wgrib2`/`grib_ls` or GRIB
+magic bytes), that step is skipped. Pass `--overwrite` to force re-download.
+Each step logs elapsed time; a timing summary (per-step + TOTAL) is printed at the end.
 
 **Auto-log (quiet):** full stdout/stderr go to
 `$WORK_BASE/logs/preprocess/preprocess_<start>_<end>_<stage>_<timestamp>.log`.
