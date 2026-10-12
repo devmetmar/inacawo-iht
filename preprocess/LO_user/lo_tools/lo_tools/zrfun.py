@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 from lo_tools import Lfun
 import sys
+import os
 import pickle
+from pathlib import Path
 
 def get_basic_info(fn, only_G=False, only_S=False, only_T=False):
     """
@@ -249,18 +251,51 @@ def get_S(S_info_dict):
     S['Cs_w'] = Cs_w
     return S
 
+def _resolve_varinfo_yaml(Ldir):
+    """
+    Locate the edited ROMS varinfo.yaml used by LiveOcean forcing.
+
+    Priority (InaCAWO-aware, then classic Parker layout):
+      1. $LO_ROMS_VARINFO (full path to yaml)
+      2. $LO_ROMS_SOURCE_ALT/varinfo/varinfo.yaml
+      3. Ldir['roms_source_alt']/varinfo/varinfo.yaml
+      4. Ldir['data']/varinfo/varinfo.yaml  (seeded under LO_DATA)
+      5. Ldir['parent']/LO_roms_source_alt/varinfo/varinfo.yaml
+    """
+    candidates = []
+    env_fn = os.environ.get('LO_ROMS_VARINFO')
+    if env_fn:
+        candidates.append(Path(env_fn))
+    env_alt = os.environ.get('LO_ROMS_SOURCE_ALT')
+    if env_alt:
+        candidates.append(Path(env_alt) / 'varinfo' / 'varinfo.yaml')
+    rsa = Ldir.get('roms_source_alt')
+    if rsa:
+        candidates.append(Path(rsa) / 'varinfo' / 'varinfo.yaml')
+    candidates.append(Ldir['data'] / 'varinfo' / 'varinfo.yaml')
+    candidates.append(Ldir['parent'] / 'LO_roms_source_alt' / 'varinfo' / 'varinfo.yaml')
+    for fn in candidates:
+        if fn.is_file():
+            return fn
+    tried = '\n  '.join(str(p) for p in candidates)
+    raise FileNotFoundError(
+        'varinfo.yaml not found. Tried:\n  ' + tried +
+        '\nSet LO_ROMS_VARINFO or LO_ROMS_SOURCE_ALT, or seed '
+        '$LO_DATA/varinfo/varinfo.yaml'
+    )
+
 def make_varinfo_list():
     """
     This method pre-parses varinfo.yaml into a list for faster use by get_varinfo()
     
     Configured to use the new ROMS varinfo.yaml (1/2022), but you need a few edits
-    so we use our modified version in LO_roms_source/npzd_banas.
+    so we use our modified version in LO_roms_source_alt/varinfo.
     """
     import yaml
         
     # specify which varinfo.yaml to use
     Ldir = Lfun.Lstart()
-    fn = Ldir['parent'] / 'LO_roms_source_alt' / 'varinfo' / 'varinfo.yaml'
+    fn = _resolve_varinfo_yaml(Ldir)
     
     # parse into a list of dicts
     with open(fn,'r') as f:

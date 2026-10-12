@@ -24,6 +24,9 @@ parent = HOME
 roms_code = parent / 'LiveOcean_roms'
 traps_name = 'traps00'
 
+_default_roms_alt = Path('/scratch/cawohdcst_ft/home/cawohdcst/LO_roms_source_alt')
+roms_source_alt = Path(os.environ.get('LO_ROMS_SOURCE_ALT', _default_roms_alt))
+
 roms_out = Path(os.environ.get('LO_ROMS', CAWO_INPUT / 'LO_roms'))
 roms_out1 = parent / 'BLANK'
 roms_out2 = parent / 'BLANK'
@@ -51,6 +54,7 @@ Ldir0['LOo'] = LOo
 Ldir0['LOu'] = LOu
 Ldir0['data'] = data
 Ldir0['roms_code'] = roms_code
+Ldir0['roms_source_alt'] = roms_source_alt
 Ldir0['roms_out'] = roms_out
 Ldir0['roms_out1'] = roms_out1
 Ldir0['roms_out2'] = roms_out2

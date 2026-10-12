@@ -75,7 +75,7 @@ elif args.run_type == 'backfill':
 else:
     print('Error: Unknown run_type')
     sys.exit()
-    
+
 if args.run_type == 'backfill':
     print(('Forcing: %s, %s, %s-%s ' % (args.frc, args.run_type, ds0, ds1)).center(60,'-'))
 else:
@@ -84,18 +84,18 @@ else:
 # loop over all days
 dt = dt0
 while dt <= dt1:
-    
+
     # fix start_type bug
     if (dt != dt0) and (args.start_type == 'new'):
         args.start_type = 'continuation'
-    
+
     # make clean output directories
     out_dir = Ldir['LOo'] / 'forcing' / Ldir['gridname'] / ('f' + dt.strftime(Lfun.ds_fmt)) / args.frc
     print(f"out_dir {out_dir}")
     Lfun.make_dir(out_dir, clean=True)
     Lfun.make_dir(out_dir / 'Data')
     Lfun.make_dir(out_dir / 'Info')
-    
+
     # run the code
     f_fn = 'make_forcing_main_nobio.py'
     cmd_list = ['python3', str(f_fn),
@@ -110,11 +110,21 @@ while dt <= dt1:
     if len(stderr) > 0:
         with open(out_dir / 'Info' / 'subprocess_error.txt', 'w') as ffout:
             ffout.write(stderr.decode())
-    
+
     # this is intended to end up in the log that the cron job makes
     res_fn = out_dir / 'Info' / 'results.txt'
+    if proc.returncode != 0 or not res_fn.is_file():
+        print(f'ERROR: {f_fn} failed for {dt.strftime(Lfun.ds_fmt)} '
+              f'(rc={proc.returncode}, results={res_fn.is_file()})')
+        err_fn = out_dir / 'Info' / 'subprocess_error.txt'
+        if err_fn.is_file():
+            print(err_fn.read_text()[-4000:])
+        elif stderr:
+            print(stderr.decode()[-4000:])
+        sys.exit(proc.returncode if proc.returncode else 1)
+
     with open(res_fn, 'r') as fout:
         for line in fout:
-            print(line.replace('\n',''))   
+            print(line.replace('\n',''))
     dt += timedelta(days=1)
     print('')

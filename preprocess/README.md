@@ -97,7 +97,15 @@ Vault pull is opt-in (`IHT_VAULT_CREDS=1`) for operators only.
 1. `get_era5/` + `get_glorys/`
 2. `wps_run/` (needs ERA5)
 3. `get_swan_bry/` (needs ERA5 waves)
-4. `get_roms_icbc/` (needs GLORYS + shared `GRID_DATA`)
+4. `get_roms_icbc/` (needs GLORYS + shared `GRID_DATA` + LO `varinfo.yaml`)
+
+Before ROMS stages, `run_preprocess.bash` seeds under `$LO_DATA`:
+- `grids/cawo/` ← shared `$GRID_DATA`
+- `varinfo/varinfo.yaml` ← `$LO_ROMS_VARINFO` (from `$LO_ROMS_SOURCE_ALT`)
+
+`zrfun.get_varinfo` resolves that yaml via env / `Ldir['roms_source_alt']` /
+`$LO_DATA/varinfo` (not `$HOME/LO_roms_source_alt`). Note: env `VARINFO` is the
+COAWST `varinfo.dat` dir for hindcast_run — different file.
 
 SLURM scripts honor `IHT_START_DATE` / `IHT_END_DATE` (or `IHT_*_ISO` / `IHT_*_DOT`)
 when set by the entrypoint; otherwise they keep built-in fallback dates.

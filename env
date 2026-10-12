@@ -45,6 +45,8 @@ export ROMS_FORCING="${ROMS_FORCING:-${CAWO_INPUT}/roms_forcing}"
 # -----------------
 export CAWO_HINDCAST_RUN="${CAWO_HINDCAST_BASE}/cawo_hindcast_run"
 export SWAN_STATIC="${SWAN_STATIC:-${SHARED_DATA}/cawo_hindcast_run/test_runs/cycle_2024061018_v5}"
+# COAWST/hindcast_run varinfo.dat directory (NOT the LO yaml used by zrfun).
+# LO yaml path is LO_ROMS_VARINFO / LO_ROMS_SOURCE_ALT (see inacawo-deps/env).
 export VARINFO="${VARINFO:-${SWAN_STATIC}}"
 export GRID_SCRIP="${GRID_SCRIP:-${SHARED_DATA}/cawo_hindcast_run}"
 export IN_TEMPLATES="${WORK_BASE}/hindcast_run/in_templates"

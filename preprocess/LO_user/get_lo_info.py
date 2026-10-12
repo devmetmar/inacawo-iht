@@ -23,12 +23,18 @@ LOu = Path(os.environ.get('LO_USER', HOME / 'inacawo-iht' / 'preprocess' / 'LO_u
 data = Path(os.environ.get('LO_DATA', CAWO_INPUT / 'LO_data'))
 LOo = Path(os.environ.get('LO_OUTPUT', CAWO_INPUT / 'LO_output'))
 
-# Generic parent used by some LO helpers (not used for data/output above)
+# Generic parent used by some LO helpers (not used for data/output above).
+# Classic LO expects siblings under parent/ (e.g. LO_roms_source_alt); InaCAWO
+# instead sets LO_ROMS_SOURCE_ALT / LO_ROMS_VARINFO and seeds $LO_DATA/varinfo.
 parent = HOME
 
 # Obsolete for current InaCAWO builds; kept for LO API compatibility
 roms_code = parent / 'LiveOcean_roms'
 traps_name = 'traps00'
+
+# Edited ROMS varinfo.yaml tree (zrfun.get_varinfo) — shared site default via env
+_default_roms_alt = Path('/scratch/cawohdcst_ft/home/cawohdcst/LO_roms_source_alt')
+roms_source_alt = Path(os.environ.get('LO_ROMS_SOURCE_ALT', _default_roms_alt))
 
 roms_out = Path(os.environ.get('LO_ROMS', CAWO_INPUT / 'LO_roms'))
 roms_out1 = parent / 'BLANK'
@@ -57,6 +63,7 @@ Ldir0['LOo'] = LOo
 Ldir0['LOu'] = LOu
 Ldir0['data'] = data
 Ldir0['roms_code'] = roms_code
+Ldir0['roms_source_alt'] = roms_source_alt
 Ldir0['roms_out'] = roms_out
 Ldir0['roms_out1'] = roms_out1
 Ldir0['roms_out2'] = roms_out2

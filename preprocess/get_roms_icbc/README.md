@@ -11,6 +11,11 @@ source $HOME/inacawo-iht/setup_env.bash
 # GLORYS under $GLORYS_BASE_DIR; grids under $GRID_DATA (shared by default)
 ```
 
+`run_preprocess.bash --stage roms` auto-links `$GRID_DATA/{grid.nc,S_COORDINATE_INFO.csv,...}`
+into `$LO_DATA/grids/cawo/` (required by LiveOcean ocnA0). Without that link,
+ocnA0 fails looking for `LO_data/grids/cawo/grid.nc`, and ocnGcawo then fails
+looking for `roms_forcing/fYYYYMMDD/ocnA0/ocean_clm.nc`.
+
 Paths:
 
 | Var | Typical value |
@@ -18,6 +23,7 @@ Paths:
 | `LO` | `$HOME/inacawo-deps/LO` |
 | `LO_USER` | `$HOME/inacawo-iht/preprocess/LO_user` |
 | `LO_DATA` / `LO_OUTPUT` | `$CAWO_INPUT/LO_{data,output}` |
+| `GRID_DATA` | `/scratch/cawohdcst_ft/data/grids` (shared) |
 | `ROMS_FORCING` | `$CAWO_INPUT/roms_forcing` (writable) |
 
 ## SLURM entrypoints

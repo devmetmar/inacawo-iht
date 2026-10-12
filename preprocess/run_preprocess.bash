@@ -837,6 +837,77 @@ _iht_dev1_mpi_overrides() {
   fi
 }
 
+# Ensure LO expects $LO_DATA/grids/cawo/{grid.nc,S_COORDINATE_INFO.csv,...}
+# by linking from shared $GRID_DATA (used by ocnA0 / LiveOcean).
+_iht_seed_lo_grid() {
+  local lo_data="${LO_DATA:-${CAWO_INPUT:-}/LO_data}"
+  local grid_src="${GRID_DATA:-}"
+  local dest="${lo_data}/grids/cawo"
+  local f linked=0
+
+  if [[ -z "${grid_src}" || ! -d "${grid_src}" ]]; then
+    echo "ERROR: GRID_DATA unset or missing (${grid_src:-})" >&2
+    return 1
+  fi
+  if [[ ! -f "${grid_src}/grid.nc" ]]; then
+    echo "ERROR: ${grid_src}/grid.nc not found (required for ROMS ocnA0)" >&2
+    return 1
+  fi
+  mkdir -p "${dest}"
+  for f in grid.nc S_COORDINATE_INFO.csv XY_COORDINATE_INFO.csv nudgcoef.nc; do
+    if [[ -e "${grid_src}/${f}" ]]; then
+      if [[ ! -e "${dest}/${f}" ]]; then
+        ln -sfn "${grid_src}/${f}" "${dest}/${f}"
+        echo "[preprocess] linked ${dest}/${f} → ${grid_src}/${f}"
+        linked=1
+      fi
+    fi
+  done
+  if [[ ! -e "${dest}/grid.nc" ]]; then
+    echo "ERROR: failed to place ${dest}/grid.nc" >&2
+    return 1
+  fi
+  if [[ "${linked}" -eq 0 ]]; then
+    echo "[preprocess] LO grid OK: ${dest}/grid.nc"
+  fi
+  return 0
+}
+
+# Seed $LO_DATA/varinfo/varinfo.yaml for zrfun.get_varinfo (ocnA0 / ocnGcawo).
+# Source: $LO_ROMS_VARINFO or $LO_ROMS_SOURCE_ALT/varinfo/varinfo.yaml.
+_iht_seed_lo_varinfo() {
+  local lo_data="${LO_DATA:-${CAWO_INPUT:-}/LO_data}"
+  local dest_dir="${lo_data}/varinfo"
+  local dest="${dest_dir}/varinfo.yaml"
+  local src=""
+
+  if [[ -n "${LO_ROMS_VARINFO:-}" && -f "${LO_ROMS_VARINFO}" ]]; then
+    src="${LO_ROMS_VARINFO}"
+  elif [[ -n "${LO_ROMS_SOURCE_ALT:-}" && -f "${LO_ROMS_SOURCE_ALT}/varinfo/varinfo.yaml" ]]; then
+    src="${LO_ROMS_SOURCE_ALT}/varinfo/varinfo.yaml"
+  elif [[ -f /scratch/cawohdcst_ft/home/cawohdcst/LO_roms_source_alt/varinfo/varinfo.yaml ]]; then
+    src="/scratch/cawohdcst_ft/home/cawohdcst/LO_roms_source_alt/varinfo/varinfo.yaml"
+  fi
+
+  if [[ -z "${src}" ]]; then
+    echo "ERROR: varinfo.yaml not found (set LO_ROMS_VARINFO or LO_ROMS_SOURCE_ALT)" >&2
+    return 1
+  fi
+  mkdir -p "${dest_dir}"
+  if [[ ! -e "${dest}" ]]; then
+    ln -sfn "${src}" "${dest}"
+    echo "[preprocess] linked ${dest} → ${src}"
+  else
+    echo "[preprocess] LO varinfo OK: ${dest}"
+  fi
+  return 0
+}
+
+_iht_seed_lo_paths() {
+  _iht_seed_lo_grid || return 1
+  _iht_seed_lo_varinfo || return 1
+}
+
 # Verify WPS products exist for the date window (catches Slurm COMPLETED + silent fail).
 _iht_validate_wps_step() {
   local step="$1"
@@ -954,6 +1025,7 @@ _run_step() {
       ;;
     roms-a0)
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
+      _iht_seed_lo_paths || exit 1
       local script
       if [[ "${DAY1}" -eq 1 ]]; then
         script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_day1.bash"
@@ -964,6 +1036,7 @@ _run_step() {
       ;;
     roms-gcawo)
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
+      _iht_seed_lo_paths || exit 1
       local script extra=()
       if [[ "${DAY1}" -eq 1 ]]; then
         script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_day1.bash"
