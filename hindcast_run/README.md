@@ -8,7 +8,10 @@ and submit the 3-way model.
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
 # preprocess complete: WPS, SWAN BCs, ROMS forcing under $CAWO_INPUT
-# model tree at $MODEL_BASE (see $COAWST_ENV / built binaries)
+# model binaries at $MODEL_BASE (default $HOME/inacawo-src):
+#   cawo_3way_swell_mods_ramp_tides/coawstM      # day1
+#   cawo_3way_swell_mods_no_ramp_tides/coawstM   # continuing
+# Build: cd $MODEL_BASE && ./build_coawstM.bash --variant both
 ```
 
 Scratch run root: **`$CAWO_HINDCAST_RUN`** (`$CAWO_HINDCAST_BASE/cawo_hindcast_run`).
