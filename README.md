@@ -121,15 +121,17 @@ LiveOcean paths come from `preprocess/LO_user/get_lo_info.py` (and `get_roms_icb
 
 ### 2. Run setup + model
 
+Preferred entrypoint (dates via CLI; see `hindcast_run/README.md`):
+
 ```bash
-cd hindcast_run
-python create_folders.py
-python modify_dot_in.py          # add --day1 for first day
-bash copy_files_for_run_day1.bash   # or copy_files_for_run.bash
-bash run_hindcast.bash
+./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --day1
+./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --stage setup
+./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --stage submit
 ```
 
-Day-1 uses ramp-tides binary + `in_templates/day1/`; continuing days use no-ramp + default templates.
+`--day1` applies day1 templates + ramp binary to the **first** day of the
+range; later days use no-ramp + default templates. Quiet logs under
+`$WORK_BASE/logs/hindcast/`.
 
 ### 3. Postprocess
 

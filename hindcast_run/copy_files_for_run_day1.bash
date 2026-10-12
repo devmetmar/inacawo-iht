@@ -23,9 +23,14 @@ WPS_BASE=$WPS_RUN_DIR
 SWAN_BCS="$CAWO_INPUT/swan_bcs"
 MODEL_DIR="$MODEL_BASE/cawo_3way_swell_mods_ramp_tides"
 
-# === Define date range ===
-date_start=19950101
-date_end=19950101
+# === Date range: prefer IHT_* from run_hindcast.bash; fallback for manual runs ===
+date_start="${IHT_START_DATE:-19950101}"
+date_end="${IHT_END_DATE:-19950101}"
+if [[ ! "${date_start}" =~ ^[0-9]{8}$ || ! "${date_end}" =~ ^[0-9]{8}$ ]]; then
+  echo "ERROR: dates must be YYYYMMDD (got start=${date_start} end=${date_end})" >&2
+  exit 2
+fi
+echo "[copy] date range ${date_start} → ${date_end} (ramp-tides / day1 binary)"
 
 # --- helper functions ---
 

@@ -5,7 +5,9 @@ Templates for the **first** hindcast day (ramp tides / startup IC).
 Used when running:
 
 ```bash
-python modify_dot_in.py --day1
+# Prefer: ./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --day1
+python modify_dot_in.py YYYYMMDD YYYYMMDD --day1
+export IHT_START_DATE=YYYYMMDD IHT_END_DATE=YYYYMMDD
 bash copy_files_for_run_day1.bash
 ```
 
