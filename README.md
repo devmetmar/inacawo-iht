@@ -9,7 +9,7 @@ Each calendar day runs as a separate integration (`fYYYYMMDD`).
 |------|------|
 | `$HOME/inacawo-deps` | Conda env (`hindcast.yml`) + LiveOcean code (`LO/`) |
 | `$HOME/inacawo-iht` | **This repo** — preprocess / run / postprocess scripts |
-| `$HOME/inacawo-src` | Built COAWST trees (ramp / no-ramp binaries) |
+| `$HOME/inacawo-src` | COAWST build wrapper + headers; `binaries/{ramp_tides,no_ramp_tides}/coawstM` |
 
 ## One-time setup (new machine)
 
@@ -132,6 +132,14 @@ Preferred entrypoint (dates via CLI; see `hindcast_run/README.md`):
 `--day1` applies day1 templates + ramp binary to the **first** day of the
 range; later days use no-ramp + default templates. Quiet logs under
 `$WORK_BASE/logs/hindcast/`.
+
+| Stage | Script | Binary |
+|---|---|---|
+| day 1 | `copy_files_for_run_day1.bash` | `$MODEL_BASE/binaries/ramp_tides/coawstM` |
+| continuing days | `copy_files_for_run.bash` | `$MODEL_BASE/binaries/no_ramp_tides/coawstM` |
+
+Build both with `bash $HOME/inacawo-src/build_coawst.bash --sbatch` (see
+the inacawo-src README).
 
 ### 3. Postprocess
 
