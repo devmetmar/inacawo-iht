@@ -18,6 +18,11 @@ Download and build all forcing needed for a hindcast day. Code lives here under
 ./run_preprocess.bash --help
 ```
 
+**`--day1` (ROMS only):** like `run_hindcast --day1` — the **first** day of
+`--start`..`--end` uses day1 scripts (`ocnA0_day1` / `ocnGcawo_day1`); remaining
+days use continuing scripts (`*_par`). If `start==end`, only that day is day1.
+WPS/SWAN/download are unchanged by `--day1`.
+
 `run_preprocess.bash` sources `setup_env.bash` itself, sets `IHT_START_DATE` /
 `IHT_END_DATE` (and ISO/dot variants), and dispatches subdirectory scripts. Dates
 are **not** edited inside SLURM files for normal use. Use `--dry-run` to print

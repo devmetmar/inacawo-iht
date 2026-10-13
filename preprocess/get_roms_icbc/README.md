@@ -30,12 +30,14 @@ Paths:
 
 | Script | When |
 |--------|------|
-| `slurm_run_ocnA0_day1.bash` | First day — ocnA0 |
+| `slurm_run_ocnA0_day1.bash` | First day — ocnA0 (`-s new`) |
 | `slurm_run_ocnGcawo_day1.bash` | First day — GLORYS→ROMS (ocnG) |
 | `slurm_run_ocnA0_par.bash` | Continuing days — ocnA0 |
 | `slurm_run_ocnGcawo_par.bash` | Continuing days — ocnG |
 
-Edit date / parallel settings inside each script before `sbatch`.
+Prefer `run_preprocess.bash --stage roms --day1 --start … --end …`: it runs
+day1 scripts for `--start`, then `*_par` for `start+1`..`--end` (same split as
+hindcast). Dates come from `IHT_*` — no need to edit SLURM files.
 
 ## Python helpers
 

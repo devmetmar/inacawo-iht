@@ -33,10 +33,24 @@ else
 fi
 
 WAIT_JOBS="${IHT_WAIT_JOBS:-1}"
-_SBATCH_EXTRA=()
-if [[ -n "${IHT_SLURM_PARTITION:-}" ]]; then
-  _SBATCH_EXTRA+=(--partition="${IHT_SLURM_PARTITION}")
+
+# Always pick a partition (entrypoint usually already set IHT_SLURM_PARTITION).
+# Manual runs of this script alone still get HDCAST→DEV1 auto-fallback.
+if [[ -z "${IHT_SLURM_PARTITION:-}" ]]; then
+  _iht_root="${WORK_BASE:-${HOME}/inacawo-iht}"
+  if [[ -f "${_iht_root}/src/slurm_partition.bash" ]]; then
+    # shellcheck source=../src/slurm_partition.bash
+    source "${_iht_root}/src/slurm_partition.bash"
+    PARTITION_ARG=""
+    _iht_resolve_slurm_partition
+    _iht_log_slurm_partition "[submit_days]"
+  else
+    echo "ERROR: IHT_SLURM_PARTITION unset and ${_iht_root}/src/slurm_partition.bash missing" >&2
+    exit 1
+  fi
 fi
+_SBATCH_EXTRA=(--partition="${IHT_SLURM_PARTITION}")
+echo "[submit_days] partition=${IHT_SLURM_PARTITION}"
 
 _record_job() {
   local jid="$1"

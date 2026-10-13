@@ -8,7 +8,8 @@
 #   ./run_preprocess.bash --start 19950101 --end 19950105
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage download
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage download --model era5-pl
-#   ./run_preprocess.bash --start 19950101 --end 19950101 --stage roms --day1
+#   ./run_preprocess.bash --start 20251231 --end 20260105 --stage roms --day1
+#     → ROMS day1 for 20251231, then *_par for 20260101..20260105
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage wps --dry-run
 #
 set -euo pipefail
@@ -53,7 +54,10 @@ Aliases:
   all       -> download,wps,swan,roms  (default)
 
 Options:
-  --day1                    Use ROMS day-1 scripts (ocnA0/ocnGcawo day1)
+  --day1                    ROMS: first day of --start..--end uses day1 scripts;
+                            remaining days use continuing (*_par) scripts
+                            (same split as run_hindcast --day1). If start==end,
+                            only that day is day1.
   --glorys-product NAME     reanalysis (default) | interim
   --overwrite               Re-download even if outputs already exist and validate
   --dry-run                 Print commands only
@@ -278,15 +282,34 @@ else
   trap '_iht_on_interrupt TERM' TERM
 fi
 
-export IHT_START_DATE="${START}"
-export IHT_END_DATE="${END}"
-export IHT_START_DATE_ISO="$(date -d "${START}" +%Y-%m-%d)"
-export IHT_END_DATE_ISO="$(date -d "${END}" +%Y-%m-%d)"
-export IHT_START_DATE_DOT="$(date -d "${START}" +%Y.%m.%d)"
-export IHT_END_DATE_DOT="$(date -d "${END}" +%Y.%m.%d)"
+# Set IHT_* date exports for a YYYYMMDD..YYYYMMDD window (also _DAYS / _ARRAY_MAX).
+_iht_set_dates() {
+  local s="$1" e="$2"
+  export IHT_START_DATE="${s}"
+  export IHT_END_DATE="${e}"
+  export IHT_START_DATE_ISO="$(date -d "${s}" +%Y-%m-%d)"
+  export IHT_END_DATE_ISO="$(date -d "${e}" +%Y-%m-%d)"
+  export IHT_START_DATE_DOT="$(date -d "${s}" +%Y.%m.%d)"
+  export IHT_END_DATE_DOT="$(date -d "${e}" +%Y.%m.%d)"
+  _DAYS=$(( ( $(date -d "${e}" +%s) - $(date -d "${s}" +%s) ) / 86400 + 1 ))
+  _ARRAY_MAX=$((_DAYS - 1))
+}
 
-_DAYS=$(( ( $(date -d "${END}" +%s) - $(date -d "${START}" +%s) ) / 86400 + 1 ))
-_ARRAY_MAX=$((_DAYS - 1))
+_iht_set_dates "${START}" "${END}"
+
+# --day1 split (ROMS only; same idea as run_hindcast)
+DAY1_START=""
+DAY1_END=""
+CONT_START=""
+CONT_END=""
+if [[ "${DAY1}" -eq 1 ]]; then
+  DAY1_START="${START}"
+  DAY1_END="${START}"
+  if [[ "${START}" -lt "${END}" ]]; then
+    CONT_START="$(date -d "${START} + 1 day" +%Y%m%d)"
+    CONT_END="${END}"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Stage expand + model filter
@@ -378,71 +401,18 @@ export IHT_OVERWRITE="${OVERWRITE}"
 # Slurm partition: HDCAST if user's account is allowed, else DEV1
 # Override: --partition NAME  or  IHT_SLURM_PARTITION=NAME
 # ---------------------------------------------------------------------------
-_iht_user_slurm_accounts() {
-  if command -v sacctmgr >/dev/null 2>&1; then
-    sacctmgr -n show associations where user="${USER}" format=Account -P 2>/dev/null \
-      | awk -F'|' 'NF && $1 != "" {print $1}' | sort -u
-  fi
-}
-
-_iht_partition_allow_accounts() {
-  local part="$1"
-  local line
-  line="$(scontrol show partition "${part}" -o 2>/dev/null || true)"
-  [[ -n "${line}" ]] || return 1
-  if [[ "${line}" =~ AllowAccounts=([^ ]+) ]]; then
-    echo "${BASH_REMATCH[1]}"
-    return 0
-  fi
-  echo "ALL"
-}
-
-_iht_account_allowed_on_partition() {
-  local part="$1"
-  local allow a uacc
-  allow="$(_iht_partition_allow_accounts "${part}" || true)"
-  [[ -n "${allow}" ]] || return 1
-  [[ "${allow}" == "ALL" ]] && return 0
-  while IFS= read -r uacc; do
-    [[ -z "${uacc}" ]] && continue
-    IFS=',' read -r -a _allowed <<< "${allow}"
-    for a in "${_allowed[@]}"; do
-      [[ "${uacc}" == "${a}" ]] && return 0
-    done
-  done < <(_iht_user_slurm_accounts)
-  return 1
-}
-
-_PARTITION_SOURCE="auto"
-# Sets IHT_SLURM_PARTITION + _PARTITION_SOURCE (must not run in a subshell).
-_iht_resolve_slurm_partition() {
-  local preferred="${IHT_SLURM_PARTITION_PREFERRED:-HDCAST}"
-  local fallback="${IHT_SLURM_PARTITION_FALLBACK:-DEV1}"
-  # Explicit CLI / env wins
-  if [[ -n "${PARTITION_ARG}" ]]; then
-    _PARTITION_SOURCE="cli"
-    IHT_SLURM_PARTITION="${PARTITION_ARG}"
-  elif [[ -n "${IHT_SLURM_PARTITION:-}" ]]; then
-    _PARTITION_SOURCE="env"
-    # keep existing IHT_SLURM_PARTITION
-  else
-    _PARTITION_SOURCE="auto"
-    if command -v scontrol >/dev/null 2>&1 && _iht_account_allowed_on_partition "${preferred}"; then
-      IHT_SLURM_PARTITION="${preferred}"
-    else
-      IHT_SLURM_PARTITION="${fallback}"
-    fi
-  fi
-  export IHT_SLURM_PARTITION
-  # Also set SBATCH_* so nested/manual sbatch in the same env picks it up
-  export SBATCH_PARTITION="${IHT_SLURM_PARTITION}"
-}
-
+# shellcheck source=../src/slurm_partition.bash
+source "${_IHT_ROOT}/src/slurm_partition.bash"
 _iht_resolve_slurm_partition
 
-echo "[preprocess] ${IHT_START_DATE} → ${IHT_END_DATE} (${_DAYS} day(s))"
+echo "[preprocess] ${START} → ${END} (${_DAYS} day(s))"
 echo "[preprocess] steps: ${_STEPS[*]}"
-[[ "${DAY1}" -eq 1 ]] && echo "[preprocess] ROMS mode: day1"
+if [[ "${DAY1}" -eq 1 ]]; then
+  echo "[preprocess] ROMS --day1: day1 slice ${DAY1_START} → ${DAY1_END}"
+  if [[ -n "${CONT_START}" ]]; then
+    echo "[preprocess] ROMS --day1: continuing slice ${CONT_START} → ${CONT_END}"
+  fi
+fi
 [[ "${DRY_RUN}" -eq 1 ]] && echo "[preprocess] DRY-RUN"
 if [[ "${WAIT_JOBS}" -eq 1 ]]; then
   echo "[preprocess] wait=ON (sequential Slurm monitor → SST log; use --no-wait to detach)"
@@ -454,17 +424,7 @@ if [[ "${OVERWRITE}" -eq 1 ]]; then
 else
   echo "[preprocess] overwrite=OFF (skip valid existing download outputs)"
 fi
-case "${_PARTITION_SOURCE}" in
-  cli) echo "[preprocess] partition=${IHT_SLURM_PARTITION} (--partition)" ;;
-  env) echo "[preprocess] partition=${IHT_SLURM_PARTITION} (IHT_SLURM_PARTITION)" ;;
-  *)
-    if [[ "${IHT_SLURM_PARTITION}" == "${IHT_SLURM_PARTITION_FALLBACK:-DEV1}" ]]; then
-      echo "[preprocess] partition=${IHT_SLURM_PARTITION} (auto: no Slurm account on HDCAST → fallback)"
-    else
-      echo "[preprocess] partition=${IHT_SLURM_PARTITION} (auto: account allowed on HDCAST)"
-    fi
-    ;;
-esac
+_iht_log_slurm_partition "[preprocess]"
 
 # ---------------------------------------------------------------------------
 # Timing + download skip helpers
@@ -1026,26 +986,37 @@ _run_step() {
     roms-a0)
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       _iht_seed_lo_paths || exit 1
-      local script
       if [[ "${DAY1}" -eq 1 ]]; then
-        script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_day1.bash"
+        # First calendar day: day1 / "new" init
+        _iht_set_dates "${DAY1_START}" "${DAY1_END}"
+        _sbatch_step "roms-a0-day1" "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_day1.bash"
+        if [[ -n "${CONT_START}" ]]; then
+          _iht_set_dates "${CONT_START}" "${CONT_END}"
+          _sbatch_step "roms-a0-cont" "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_par.bash"
+        fi
+        _iht_set_dates "${START}" "${END}"
       else
-        script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_par.bash"
+        _sbatch_step "roms-a0" "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnA0_par.bash"
       fi
-      _sbatch_step "roms-a0" "${script}"
       ;;
     roms-gcawo)
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
       _iht_seed_lo_paths || exit 1
-      local script extra=()
       if [[ "${DAY1}" -eq 1 ]]; then
-        script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_day1.bash"
+        _iht_set_dates "${DAY1_START}" "${DAY1_END}"
+        _sbatch_step "roms-gcawo-day1" "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_day1.bash"
+        if [[ -n "${CONT_START}" ]]; then
+          _iht_set_dates "${CONT_START}" "${CONT_END}"
+          _sbatch_step "roms-gcawo-cont" \
+            "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_par.bash" \
+            --array="0-${_ARRAY_MAX}%8"
+        fi
+        _iht_set_dates "${START}" "${END}"
       else
-        script="${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_par.bash"
-        # Override array length to match date window
-        extra=(--array="0-${_ARRAY_MAX}%8")
+        _sbatch_step "roms-gcawo" \
+          "${_PRE_ROOT}/get_roms_icbc/slurm_run_ocnGcawo_par.bash" \
+          --array="0-${_ARRAY_MAX}%8"
       fi
-      _sbatch_step "roms-gcawo" "${script}" "${extra[@]}"
       ;;
     *)
       echo "ERROR: unhandled step ${step}" >&2

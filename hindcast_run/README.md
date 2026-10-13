@@ -8,7 +8,7 @@ and submit the 3-way model.
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
 # preprocess complete: WPS, SWAN BCs, ROMS forcing under $CAWO_INPUT
-# model tree at $MODEL_BASE (see $COAWST_ENV / built binaries)
+# coawstM: $MODEL_BASE/binaries/{ramp_tides,no_ramp_tides}/ (from inacawo-src)
 ```
 
 Scratch run root: **`$CAWO_HINDCAST_RUN`** (`$CAWO_HINDCAST_BASE/cawo_hindcast_run`).
@@ -40,8 +40,13 @@ realpath only). Monitor with `tail -f <logfile>`. Ctrl+C stops children and
 remaining days use continuing templates + no-ramp. Without `--day1`, the whole
 range is continuing (needs prior-day restart under `$CAWO_OUTPUT`).
 
-**Partition:** no auto HDCAST→DEV1 (88-node job). Override with `--partition`
+**Partition:** auto-selects `HDCAST` if your Slurm account is allowed, else
+`DEV1` (avoids stuck `PENDING (PartitionConfig)`). Override with `--partition`
 or `IHT_SLURM_PARTITION`.
+
+**MPI fabric:** HDCAST → `mlx`/`ib0`; DEV1 → `verbs` (same IB hardware;
+`mlx`+`ib0` triggers OFI AV map failure for `coawstM` on DEV1). Conda
+`libfabric`/`mpich` are stripped from `LD_LIBRARY_PATH` before launch.
 
 ## Layout
 

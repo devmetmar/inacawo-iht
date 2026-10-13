@@ -425,7 +425,7 @@ LtracerSponge == T T                            ! temperature, salinity, inert
 ! NetCDF units attribute.
 
 !      DSTART =  59792.0d0                      ! days = 59792 days offset from Nov 17, 1858
-      DSTART =  49718.5d0                      ! days
+      DSTART =  dstart                      ! days
   TIDE_START =  0.0d0                      ! days
     TIME_REF =  18581117.0d0                      ! yyyymmdd.dd
 

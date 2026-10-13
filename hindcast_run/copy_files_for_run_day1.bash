@@ -21,7 +21,7 @@ shopt -s nullglob
 RUNS_DIR=$CAWO_HINDCAST_RUN
 WPS_BASE=$WPS_RUN_DIR
 SWAN_BCS="$CAWO_INPUT/swan_bcs"
-MODEL_DIR="$MODEL_BASE/cawo_3way_swell_mods_ramp_tides"
+MODEL_DIR="${MODEL_BASE}/binaries/ramp_tides"
 
 # === Date range: prefer IHT_* from run_hindcast.bash; fallback for manual runs ===
 date_start="${IHT_START_DATE:-19950101}"

@@ -46,7 +46,8 @@ Options:
   --dry-run                 Print commands only
   --wait                    Wait for each day's Slurm job (default; DONE + scancel)
   --no-wait                 Submit all days and exit (no DONE poll)
-  --partition NAME          Slurm partition override (no auto HDCAST→DEV1)
+  --partition NAME          Slurm partition override
+                            (default: auto — HDCAST if account allowed, else DEV1)
   --no-log                  Do not write $WORK_BASE/logs/ (default: auto-log)
   -v, --verbose             Also mirror log to this terminal (default: quiet)
   -h, --help                Show this help
@@ -237,13 +238,10 @@ export IHT_START_DATE_DOT="$(date -d "${START}" +%Y.%m.%d)"
 export IHT_END_DATE_DOT="$(date -d "${END}" +%Y.%m.%d)"
 export IHT_WAIT_JOBS="${WAIT_JOBS}"
 
-if [[ -n "${PARTITION_ARG}" ]]; then
-  export IHT_SLURM_PARTITION="${PARTITION_ARG}"
-elif [[ -n "${IHT_SLURM_PARTITION:-}" ]]; then
-  : # keep env
-else
-  unset IHT_SLURM_PARTITION 2>/dev/null || true
-fi
+# Slurm partition: HDCAST if account allowed, else DEV1 (avoids PartitionConfig)
+# shellcheck source=../src/slurm_partition.bash
+source "${_IHT_ROOT}/src/slurm_partition.bash"
+_iht_resolve_slurm_partition
 
 # Day1 split: first day vs rest
 DAY1_START=""
@@ -319,8 +317,9 @@ _day1_label=OFF
 [[ "${DRY_RUN}" -eq 1 ]] && _dry_label=ON
 [[ "${DAY1}" -eq 1 ]] && _day1_label=ON
 echo "[hindcast] wait=${_wait_label} dry-run=${_dry_label} day1=${_day1_label}"
-if [[ -n "${IHT_SLURM_PARTITION:-}" ]]; then
-  echo "[hindcast] partition=${IHT_SLURM_PARTITION}"
+_iht_log_slurm_partition "[hindcast]"
+if [[ "${IHT_SLURM_PARTITION}" != "HDCAST" ]]; then
+  echo "[hindcast] MPI fabric on ${IHT_SLURM_PARTITION}: verbs (HDCAST uses mlx/ib0)"
 fi
 if [[ "${DAY1}" -eq 1 ]]; then
   echo "[hindcast] day1 slice: ${DAY1_START} → ${DAY1_END}"

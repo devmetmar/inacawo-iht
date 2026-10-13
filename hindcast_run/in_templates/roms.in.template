@@ -1045,7 +1045,7 @@ Dout(iTvdif) == F F     ! temp_vdiff, ...    vertical diffusion
      TLMNAME == CAWO_OUTPUT/ftoday/cawo_g2.8.0_tide_tlm.nc
      TLFNAME == CAWO_OUTPUT/ftoday/cawo_g2.8.0_tide_tlf.nc
      ADJNAME == roms_adj.nc
-     AVGNAME == CAWO_OUTPUT/f19950101/cawo_g2.8.0_avg_oday_12.nc
+     AVGNAME == CAWO_OUTPUT/ftoday/cawo_g2.8.0_avg_oday_12.nc
      HARNAME == roms_har.nc
      DIANAME == roms_dia.nc
      STANAME == roms_sta.nc
