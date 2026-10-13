@@ -62,7 +62,7 @@ Options:
   --overwrite               Re-download even if outputs already exist and validate
   --dry-run                 Print commands only
   --wait                    Wait for SLURM jobs (default)
-  --no-wait                 Submit SLURM jobs and exit (WPS chained via afterok)
+  --no-wait                 Submit SLURM jobs and exit (WPS chained via aftercorr)
   --partition NAME          Slurm partition (default: auto — HDCAST if allowed, else DEV1)
   --no-log                  Do not write $WORK_BASE/logs/ (default: auto-log)
   -v, --verbose             Also mirror log to this terminal (default: quiet)
@@ -74,9 +74,10 @@ Download behaviour:
   or GRIB magic bytes). Pass --overwrite to force re-download.
 
 SLURM behaviour (wps / swan / roms):
-  Default: submit → wait → follow each job's Slurm log into the preprocess
-  SST log, sequentially (ungrib then metgrid then real for --stage wps).
-  Use --no-wait to fire-and-forget (WPS still uses afterok dependencies).
+  Per-day Slurm arrays for ungrib/metgrid/real/swan/roms-gcawo (days are
+  independent within a stage). Stages still run ungrib → metgrid → real.
+  Default: submit → wait for each array → validate products.
+  --no-wait: fire-and-forget; WPS uses aftercorr so day i waits on day i only.
 
 Logs (default, under iht repo):
   $WORK_BASE/logs/preprocess/preprocess_<start>_<end>_<stage>_<timestamp>.log
@@ -417,7 +418,7 @@ fi
 if [[ "${WAIT_JOBS}" -eq 1 ]]; then
   echo "[preprocess] wait=ON (sequential Slurm monitor → SST log; use --no-wait to detach)"
 else
-  echo "[preprocess] wait=OFF (submit only; WPS uses afterok chain)"
+  echo "[preprocess] wait=OFF (submit only; WPS uses aftercorr chain)"
 fi
 if [[ "${OVERWRITE}" -eq 1 ]]; then
   echo "[preprocess] overwrite=ON (force re-download)"
@@ -609,6 +610,8 @@ _sbatch_resolve_log() {
   out_pat="${out_pat//%j/${jid}}"
   out_pat="${out_pat//%J/${jid}}"
   out_pat="${out_pat//%A/${jid}}"
+  # Array jobs: follow task 0 as the representative live log
+  out_pat="${out_pat//%a/0}"
   if [[ "${out_pat}" != /* ]]; then
     out_pat="${script_dir}/${out_pat}"
   fi
@@ -722,20 +725,23 @@ _wait_one_job() {
   _iht_stop_tail
 
   if command -v sacct >/dev/null 2>&1; then
-    # Brief settle for accounting
+    # Brief settle for accounting (array jobs may have many task lines)
     sleep 2
-    state="$(sacct -n -X -j "${jid}" -o State --parsable2 2>/dev/null | head -n1 | tr -d ' ')"
-    case "${state}" in
-      COMPLETED|"") ;;
-      *)
-        echo "ERROR: ${label} job ${jid} sacct state=${state}" >&2
-        if [[ -n "${logfile}" && -f "${logfile}" ]]; then
-          echo "--- last 80 lines of ${logfile} ---"
-          tail -n 80 "${logfile}"
-        fi
-        return 1
-        ;;
-    esac
+    local bad=""
+    while IFS= read -r state; do
+      state="$(echo "${state}" | tr -d ' ')"
+      [[ -z "${state}" || "${state}" == "COMPLETED" ]] && continue
+      bad="${state}"
+      break
+    done < <(sacct -n -X -j "${jid}" -o State --parsable2 2>/dev/null || true)
+    if [[ -n "${bad}" ]]; then
+      echo "ERROR: ${label} job ${jid} sacct state=${bad}" >&2
+      if [[ -n "${logfile}" && -f "${logfile}" ]]; then
+        echo "--- last 80 lines of ${logfile} ---"
+        tail -n 80 "${logfile}"
+      fi
+      return 1
+    fi
   fi
 
   if [[ -n "${logfile}" && -f "${logfile}" ]]; then
@@ -787,7 +793,7 @@ _wait_jobs() {
   done
 }
 
-# Track last WPS job for afterok chain within this invocation
+# Track last WPS array job for aftercorr chain within this invocation
 _LAST_WPS_DEP=""
 
 # DEV1: shrink multi-node IB jobs to 1 node (mlx/ib0 fails on DEV1).
@@ -950,38 +956,51 @@ _run_step() {
         python "${gpy}" "${IHT_START_DATE}" "${IHT_END_DATE}"
       ;;
     ungrib)
+      # Per-day Slurm array (days independent). Concurrency capped at 16.
       mkdir -p "${_PRE_ROOT}/wps_run/log"
-      _sbatch_step "ungrib" "${_PRE_ROOT}/wps_run/slurm_run_ungrib.bash"
+      _sbatch_step "ungrib" "${_PRE_ROOT}/wps_run/slurm_run_ungrib.bash" \
+        --array="0-${_ARRAY_MAX}%16"
       _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
-      _iht_validate_wps_step ungrib || exit 1
+      if [[ "${WAIT_JOBS}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
+        _iht_validate_wps_step ungrib || exit 1
+      fi
       ;;
     metgrid)
       mkdir -p "${_PRE_ROOT}/wps_run/log"
       local dep=() extra=()
-      # afterok only when fire-and-forget; with --wait we run truly sequential
+      # --no-wait: aftercorr so task i waits for ungrib task i; with --wait stages are serial
       if [[ "${WAIT_JOBS}" -eq 0 && -n "${_LAST_WPS_DEP}" ]]; then
-        dep=(--dependency="afterok:${_LAST_WPS_DEP}")
+        dep=(--dependency="aftercorr:${_LAST_WPS_DEP}")
       fi
       # shellcheck disable=SC2207
       extra=( $(_iht_dev1_mpi_overrides) )
-      _sbatch_step "metgrid" "${_PRE_ROOT}/wps_run/slurm_run_metgrid.bash" "${dep[@]}" "${extra[@]}"
+      _sbatch_step "metgrid" "${_PRE_ROOT}/wps_run/slurm_run_metgrid.bash" \
+        --array="0-${_ARRAY_MAX}%4" "${dep[@]}" "${extra[@]}"
       _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
-      _iht_validate_wps_step metgrid || exit 1
+      if [[ "${WAIT_JOBS}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
+        _iht_validate_wps_step metgrid || exit 1
+      fi
       ;;
     real)
       mkdir -p "${_PRE_ROOT}/wps_run/log"
       local dep=() extra=()
       if [[ "${WAIT_JOBS}" -eq 0 && -n "${_LAST_WPS_DEP}" ]]; then
-        dep=(--dependency="afterok:${_LAST_WPS_DEP}")
+        dep=(--dependency="aftercorr:${_LAST_WPS_DEP}")
       fi
       # shellcheck disable=SC2207
       extra=( $(_iht_dev1_mpi_overrides) )
-      _sbatch_step "real" "${_PRE_ROOT}/wps_run/slurm_run_real.bash" "${dep[@]}" "${extra[@]}"
+      _sbatch_step "real" "${_PRE_ROOT}/wps_run/slurm_run_real.bash" \
+        --array="0-${_ARRAY_MAX}%2" "${dep[@]}" "${extra[@]}"
       _LAST_WPS_DEP="${_LAST_SBATCH_JID}"
-      _iht_validate_wps_step real || exit 1
+      if [[ "${WAIT_JOBS}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
+        _iht_validate_wps_step real || exit 1
+      fi
       ;;
     swan)
-      _sbatch_step "swan" "${_PRE_ROOT}/get_swan_bry/slurm_make_swan_bc.bash"
+      # Per-day array; independent of WPS (needs era5-waves only)
+      mkdir -p "${_PRE_ROOT}/get_swan_bry/log"
+      _sbatch_step "swan" "${_PRE_ROOT}/get_swan_bry/slurm_make_swan_bc.bash" \
+        --array="0-${_ARRAY_MAX}%8"
       ;;
     roms-a0)
       mkdir -p "${_PRE_ROOT}/get_roms_icbc/log"
