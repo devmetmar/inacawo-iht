@@ -85,15 +85,15 @@ while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
   fi
 
   jobid=$(sbatch "${_SBATCH_EXTRA[@]}" slurm_run_cawo_3way_hdcst.bash | awk '{print $4}')
+  log_file="${run_dir}/log_run_${jobid}.out"
   echo "Job submitted: $jobid"
+  echo "[submit_days] slurm log → ${log_file}"
   _record_job "$jobid"
 
   if [[ "${WAIT_JOBS}" -eq 0 ]]; then
     current_date=$(date -d "$current_date + 1 day" +%Y-%m-%d)
     continue
   fi
-
-  log_file=log_run_${jobid}.out
   # Wait until DONE appears in the log
   status=0
   while [[ $status -eq 0 ]]; do
