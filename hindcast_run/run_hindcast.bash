@@ -319,7 +319,7 @@ _day1_label=OFF
 echo "[hindcast] wait=${_wait_label} dry-run=${_dry_label} day1=${_day1_label}"
 _iht_log_slurm_partition "[hindcast]"
 if [[ "${IHT_SLURM_PARTITION}" != "HDCAST" ]]; then
-  echo "[hindcast] MPI fabric on ${IHT_SLURM_PARTITION}: verbs (HDCAST uses mlx/ib0)"
+  echo "[hindcast] MPI fabric on ${IHT_SLURM_PARTITION}: restgen-mlx @ 88×96 (UCX_TLS=all, OFI_INTERNAL=0; ATM=6048/WAV=672/OCN=1728)"
 fi
 if [[ "${DAY1}" -eq 1 ]]; then
   echo "[hindcast] day1 slice: ${DAY1_START} → ${DAY1_END}"

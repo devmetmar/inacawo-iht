@@ -4,10 +4,10 @@
 # accounts that are allowed on HDCAST.
 #SBATCH --partition=HDCAST
 #SBATCH --job-name=HDCST-FT        #passed by script
-#SBATCH --nodes=88                #passed by script
+#SBATCH --nodes=88                # production 88×96 (restgen DEV1-proven mlx/UCX recipe)
 #SBATCH --ntasks-per-node=96
 #SBATCH --exclusive
-#SBATCH --time=50:00
+#SBATCH --time=06:00:00
 #SBATCH --output=log_run_%j.out
 #SBATCH --export=ALL
 # Full node RAM (RealMemory≈251 GiB). --mem=230G OOMs: peak MaxRSS ~242 GiB → SIGKILL.
@@ -69,55 +69,117 @@ if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
   unset _ld_clean _ld_parts _p
 fi
 
-# Intel MPI fabrics:
-#   HDCAST — production mlx + ib0 (validated on HDCAST AllowAccounts)
-#   DEV1   — mlx+ib0 / FI_MLX_TLS causes OFI AV map failure for coawstM;
-#            use verbs (IB) over ofi instead (validated past MPI_Init at 8×96)
-_part="${SLURM_JOB_PARTITION:-${IHT_SLURM_PARTITION:-unknown}}"
-export I_MPI_FABRICS=shm:ofi
-export I_MPI_SHM=clx_avx2
-export I_MPI_HYDRA_PMI_CONNECT=alltoall
-export I_MPI_HYDRA_BRANCH_COUNT=4
-export I_MPI_MALLOC=1
-export I_MPI_SHM_HEAP=1
-unset I_MPI_FALLBACK || true
-
-if [[ "${_part}" == "HDCAST" ]]; then
-  echo "[hindcast-mpi] partition=HDCAST → fabric=mlx/ib0"
-  export FI_PROVIDER=mlx
-  export I_MPI_OFI_PROVIDER=mlx
-  export I_MPI_HYDRA_IFACE=ib0
-  export FI_MLX_TLS=dc,dc_x,shm,self
-else
-  echo "[hindcast-mpi] partition=${_part} → fabric=verbs (DEV1-safe; avoids mlx/ib0 OFI AV failure)"
-  unset I_MPI_HYDRA_IFACE FI_MLX_TLS I_MPI_OFI_PROVIDER || true
-  export FI_PROVIDER=verbs
+# Ensure NetCDF ($LIBDEP) is visible; do not force I_MPI_OFI_LIBRARY_INTERNAL /
+# FI_PROVIDER_PATH here — that combo with verbs@88 triggered forrtl overflows
+# (562324+). Job 562296 (verbs, no those pins) reached START_EM before PLD.
+if [[ -z "${I_MPI_ROOT:-}" ]]; then
+  echo "ERROR: I_MPI_ROOT unset after module load mpi" >&2
+  exit 1
+fi
+if [[ -n "${LIBDEP:-}" ]]; then
+  case ":${LD_LIBRARY_PATH:-}:" in
+    *":${LIBDEP}:"*) ;;
+    *) export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${LIBDEP}" ;;
+  esac
 fi
 
-export KMP_AFFINITY=verbose # do not use : ,granularity=fine,compact #
+# Clear conflicting fabric knobs; fabric block below sets the ones we want.
+unset I_MPI_HYDRA_IFACE FI_MLX_TLS I_MPI_OFI_PROVIDER FI_PROVIDER UCX_TLS \
+  FI_VERBS_IFACE I_MPI_FALLBACK || true
+
+# Preflight: refuse conda/mpich fabric leakage into coawstM
+_bad_ld="$(ldd ./coawstM 2>/dev/null | grep -E 'miniforge|/envs/hindcast|libmpich|conda' || true)"
+if [[ -n "${_bad_ld}" ]]; then
+  echo "ERROR: coawstM resolves poisoned libs:" >&2
+  echo "${_bad_ld}" >&2
+  exit 1
+fi
+echo "[hindcast-mpi] ldd preflight OK (no conda/mpich)"
+ldd ./coawstM 2>/dev/null | grep -E 'libmpi\.so|libfabric|libnetcdf' || true
+unset _bad_ld
+
+# Intel MPI fabrics — default matches restgen_production oper 88×96 template
+# (proven on DEV1: mlx + UCX_TLS=all, I_MPI_OFI_LIBRARY_INTERNAL=0, NO FI_MLX_TLS).
+# Source: restgen_production/scripts/cawo_analy/slurm_cawo_3wrsp_*88x96.template.bash
+# Override experiments: IHT_DEV1_FABRIC=verbs|mlx_dc
+_part="${SLURM_JOB_PARTITION:-${IHT_SLURM_PARTITION:-unknown}}"
+_dev1_fab="${IHT_DEV1_FABRIC:-restgen}"
+
+_iht_fabric_restgen() {
+  echo "[hindcast-mpi] partition=${_part} → fabric=restgen-mlx (UCX_TLS=all, OFI_INTERNAL=0)"
+  # UCX (keep restgen typo UCX_NET_DEVICESi for bit-identical env)
+  export UCX_NET_DEVICESi=mlx5_0:1
+  export UCX_NET_DEVICES=mlx5_0:1
+  export UCX_IB_ADDR_TYPE=ib_global
+  export UCX_TLS=all
+  export UCX_IB_RC_TM_ENABLE=y
+  export UCX_RC_MLX5_TM_ENABLE=y
+  export UCX_IB_PCI_RELAXED_ORDERING=off
+  export UCX_PROTO_ENABLE=n
+  # Intel MPI / libfabric
+  export I_MPI_FABRICS=shm:ofi
+  export FI_PROVIDER=mlx
+  export I_MPI_OFI_PROVIDER=mlx
+  export FI_VERBS_IFACE=ib0
+  export I_MPI_OFI_LIBRARY_INTERNAL=0
+  export I_MPI_SHM=clx_avx2
+  export I_MPI_MALLOC=1
+  export I_MPI_SHM_HEAP=1
+  export I_MPI_FALLBACK=0
+  export I_MPI_HYDRA_IFACE=ib0
+  export I_MPI_HYDRA_PMI_CONNECT=alltoall
+  # FI_MLX_TLS intentionally unset (restgen comments it out; dc AV fails on DEV1)
+  unset FI_MLX_TLS || true
+  export I_MPI_HYDRA_BRANCH_COUNT=-1
+  export I_MPI_EXTRA_FILESYSTEM=on
+  export I_MPI_EXTRA_FILESYSTEM_FORCE=lustre
+}
+
+case "${_dev1_fab}" in
+  restgen|"")
+    _iht_fabric_restgen
+    ;;
+  verbs)
+    echo "[hindcast-mpi] partition=${_part} → fabric=verbs (override)"
+    export I_MPI_FABRICS=shm:ofi
+    export I_MPI_SHM=clx_avx2
+    export I_MPI_MALLOC=1
+    export I_MPI_SHM_HEAP=1
+    export I_MPI_HYDRA_PMI_CONNECT=alltoall
+    export I_MPI_HYDRA_BRANCH_COUNT=4
+    export FI_PROVIDER=verbs
+    ;;
+  mlx_dc)
+    echo "[hindcast-mpi] partition=${_part} → fabric=mlx + FI_MLX_TLS=dc (may AV-fail on DEV1)"
+    export I_MPI_FABRICS=shm:ofi
+    export FI_PROVIDER=mlx
+    export I_MPI_OFI_PROVIDER=mlx
+    export I_MPI_HYDRA_IFACE=ib0
+    export FI_MLX_TLS=dc,dc_x,shm,self
+    export I_MPI_OFI_LIBRARY_INTERNAL=0
+    ;;
+  *)
+    echo "ERROR: unknown IHT_DEV1_FABRIC=${_dev1_fab} (use restgen|verbs|mlx_dc)" >&2
+    exit 2
+    ;;
+esac
+unset _dev1_fab
+
+export KMP_AFFINITY=verbose
 
 # Disable Slurm CPU binding
 export SLURM_CPU_BIND=NONE
 
-#export OMP_PLACES=
-#export OMP_BIND=
-
-#export PROFILER_DISABLE=1
-#export PROFILER_UNPLUG=1
-
-# NetCDF/HDF5 deps after Intel MPI libs (do not shadow libfabric)
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}${LIBDEP}"
-
-##time /opt/software/intel/oneapi/mpi/2021.5.1/bin/mpiexec -verbose -np 4608 -ppn 96 ./wrf.exe
-
-# Prefer Slurm bootstrap alone (hostfile optional; kept for debugging)
+# NP follows allocation; hostfile like restgen production launch.
+_NP="${SLURM_NTASKS:-$(( ${SLURM_JOB_NUM_NODES:-88} * ${SLURM_NTASKS_PER_NODE:-96} ))}"
+_PPN="${SLURM_NTASKS_PER_NODE:-96}"
+echo "[hindcast-mpi] mpiexec np=${_NP} ppn=${_PPN} nodes=${SLURM_JOB_NUM_NODES:-?}"
 nodeset -e $SLURM_NODELIST | tr ' ' '\n' > ./hostfile.${SLURM_JOBID}
-#time mpiexec.hydra -bootstrap slurm -np 12672 -ppn 96 -hostfile ./hostfile.${SLURM_JOBID} ./coawstM Projects/CAWO_3way/input/coupling_cawo.in
-#time mpiexec.hydra -bootstrap slurm -np 12672 -ppn 96 -hostfile ./hostfile.${SLURM_JOBID} ./coawstM ./coupling_cawo.in
 set +e
-mpiexec.hydra -bootstrap slurm -np 8448 -ppn 96 ./coawstM ./coupling_cawo.in
+mpiexec.hydra -bootstrap slurm -np "${_NP}" -ppn "${_PPN}" -hostfile ./hostfile.${SLURM_JOBID} ./coawstM ./coupling_cawo.in
 _rc=$?
 set -e
+unset _NP _PPN
 
 date
 

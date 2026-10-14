@@ -44,9 +44,12 @@ range is continuing (needs prior-day restart under `$CAWO_OUTPUT`).
 `DEV1` (avoids stuck `PENDING (PartitionConfig)`). Override with `--partition`
 or `IHT_SLURM_PARTITION`.
 
-**MPI fabric:** HDCAST → `mlx`/`ib0`; DEV1 → `verbs` (same IB hardware;
-`mlx`+`ib0` triggers OFI AV map failure for `coawstM` on DEV1). Conda
-`libfabric`/`mpich` are stripped from `LD_LIBRARY_PATH` before launch.
+**MPI fabric / scale:** Same **88×96** layout (ATM=6048 / WAV=672 / OCN=1728).
+Default fabric matches **restgen_production** oper template (runs on DEV1):
+`FI_PROVIDER=mlx`, `UCX_TLS=all`, `I_MPI_OFI_LIBRARY_INTERNAL=0`, `ib0`,
+**no** `FI_MLX_TLS` (dc AV fails on DEV1). Override with `IHT_DEV1_FABRIC=verbs`
+or `mlx_dc`. Launch strips conda `libfabric`/`mpich`.
+
 
 ## Layout
 
