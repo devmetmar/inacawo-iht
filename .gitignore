@@ -18,6 +18,8 @@ analysis/*
 !/logs/.gitkeep
 !/logs/preprocess/
 !/logs/preprocess/.gitkeep
+!/logs/hindcast/
+!/logs/hindcast/.gitkeep
 # LO_user runtime / local artefacts
 LOG/
 **/LOG/
@@ -27,3 +29,7 @@ driver/out_dir/
 *.log
 log.txt
 **/log.txt
+
+# NFS stale file handles
+.nfs*
+**/.nfs*
