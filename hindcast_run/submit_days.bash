@@ -94,18 +94,18 @@ while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
     current_date=$(date -d "$current_date + 1 day" +%Y-%m-%d)
     continue
   fi
-  # Wait until DONE appears in the log
+  # Wait until DONE appears in the log, then end the job immediately.
+  # (Do not wait for Slurm EXIT first — MPI often hangs in finalize after success.)
   status=0
   while [[ $status -eq 0 ]]; do
     sleep 10
     if [[ -f $log_file ]]; then
-      status=$(tail -1000 "$log_file" | grep -c "ROMS/TOMS: DONE" || true)
+      status=$(grep -c "ROMS/TOMS: DONE" "$log_file" 2>/dev/null || true)
     fi
     # Bail if job vanished without DONE (failed / cancelled)
     if ! squeue -j "$jobid" -h 2>/dev/null | grep -q .; then
-      # Job left queue — check sacct once more for DONE in log
       if [[ -f $log_file ]]; then
-        status=$(tail -1000 "$log_file" | grep -c "ROMS/TOMS: DONE" || true)
+        status=$(grep -c "ROMS/TOMS: DONE" "$log_file" 2>/dev/null || true)
       fi
       if [[ $status -eq 0 ]]; then
         echo "ERROR: job $jobid left queue without ROMS/TOMS: DONE" >&2
@@ -118,13 +118,15 @@ while [[ $(date -d "$current_date" +%s) -le $(date -d "$end_date" +%s) ]]; do
     fi
   done
 
-  # Wait until job finishes
+  if squeue -j "$jobid" -h 2>/dev/null | grep -q .; then
+    echo "DONE detected for $folder_date — scancel job $jobid now (avoid finalize hang)"
+    scancel "$jobid" 2>/dev/null || true
+  else
+    echo "DONE detected for $folder_date; job $jobid already left queue"
+  fi
   while squeue -j "$jobid" -h 2>/dev/null | grep -q .; do
-    sleep 30
+    sleep 5
   done
-
-  echo "DONE detected for $folder_date, cancelling job $jobid ..."
-  scancel "$jobid" 2>/dev/null || true
   echo "Job $jobid finished."
 
   current_date=$(date -d "$current_date + 1 day" +%Y-%m-%d)

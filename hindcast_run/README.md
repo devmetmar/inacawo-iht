@@ -50,6 +50,11 @@ Default fabric matches **restgen_production** oper template (runs on DEV1):
 **no** `FI_MLX_TLS` (dc AV fails on DEV1). Override with `IHT_DEV1_FABRIC=verbs`
 or `mlx_dc`. Launch strips conda `libfabric`/`mpich`.
 
+**Auto-end:** the Slurm script watches the job log for `ROMS/TOMS: DONE` (and
+`wrf: SUCCESS COMPLETE WRF`), then terminates `mpiexec` after a short grace
+(`IHT_MODEL_DONE_GRACE_SEC`, default 180s) so the allocation does not sit until
+walltime after a successful run. `submit_days.bash` also `scancel`s as soon as
+DONE appears.
 
 ## Layout
 

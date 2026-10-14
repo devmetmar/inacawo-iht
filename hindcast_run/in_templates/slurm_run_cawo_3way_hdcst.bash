@@ -7,12 +7,13 @@
 #SBATCH --nodes=88                # production 88×96 (restgen DEV1-proven mlx/UCX recipe)
 #SBATCH --ntasks-per-node=96
 #SBATCH --exclusive
-#SBATCH --time=06:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=log_run_%j.out
 #SBATCH --export=ALL
 # Full node RAM (RealMemory≈251 GiB). --mem=230G OOMs: peak MaxRSS ~242 GiB → SIGKILL.
 #SBATCH --mem=0
 #SBATCH --requeue
+# Soft-stop: watchdog ends the job soon after ROMS/TOMS: DONE (see launch below).
 
 
 # InaCAWO portable env + hindcast conda
@@ -175,11 +176,90 @@ _NP="${SLURM_NTASKS:-$(( ${SLURM_JOB_NUM_NODES:-88} * ${SLURM_NTASKS_PER_NODE:-9
 _PPN="${SLURM_NTASKS_PER_NODE:-96}"
 echo "[hindcast-mpi] mpiexec np=${_NP} ppn=${_PPN} nodes=${SLURM_JOB_NUM_NODES:-?}"
 nodeset -e $SLURM_NODELIST | tr ' ' '\n' > ./hostfile.${SLURM_JOBID}
+
+# Slurm stdout for this job (where ROMS/TOMS: DONE appears).
+_log="${SLURM_JOB_STDOUT:-${SLURM_SUBMIT_DIR:-.}/log_run_${SLURM_JOBID}.out}"
+# After ocean DONE, allow WRF/coupler a short grace window before force-stop.
+# MPI often hangs in finalize / stdout flush after success (seen on DEV1 88×96).
+_grace_after_roms="${IHT_MODEL_DONE_GRACE_SEC:-180}"
+_poll_sec="${IHT_MODEL_DONE_POLL_SEC:-15}"
+_wrf_wait_sec="${IHT_MODEL_WRF_WAIT_SEC:-600}"
+
+_iht_kill_mpi_tree() {
+  local pid="$1"
+  [[ -n "${pid}" ]] || return 0
+  if kill -0 "${pid}" 2>/dev/null; then
+    echo "[hindcast-mpi] terminating mpiexec pid=${pid} (model finished or hung after DONE)"
+    kill -TERM "${pid}" 2>/dev/null || true
+    local _i
+    for _i in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "${pid}" 2>/dev/null || return 0
+      sleep 1
+    done
+    kill -KILL "${pid}" 2>/dev/null || true
+    # Hydra/srun children sometimes detach from the parent pid
+    pkill -KILL -P "${pid}" 2>/dev/null || true
+  fi
+}
+
 set +e
-mpiexec.hydra -bootstrap slurm -np "${_NP}" -ppn "${_PPN}" -hostfile ./hostfile.${SLURM_JOBID} ./coawstM ./coupling_cawo.in
+set +x
+mpiexec.hydra -bootstrap slurm -np "${_NP}" -ppn "${_PPN}" \
+  -hostfile ./hostfile.${SLURM_JOBID} ./coawstM ./coupling_cawo.in &
+_mpi_pid=$!
+echo "[hindcast-mpi] mpiexec started pid=${_mpi_pid}; watchdog log=${_log}"
+
+_forced_done=0
+_roms_seen=0
+_wrf_seen=0
+_t0=$(date +%s)
+while kill -0 "${_mpi_pid}" 2>/dev/null; do
+  if [[ -f "${_log}" ]]; then
+    if [[ "${_roms_seen}" -eq 0 ]] && grep -m1 -q 'ROMS/TOMS: DONE' "${_log}" 2>/dev/null; then
+      _roms_seen=1
+      _roms_t=$(date +%s)
+      echo "[hindcast-mpi] detected ROMS/TOMS: DONE at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    fi
+    if [[ "${_roms_seen}" -eq 1 && "${_wrf_seen}" -eq 0 ]] \
+      && grep -m1 -q 'wrf: SUCCESS COMPLETE WRF' "${_log}" 2>/dev/null; then
+      _wrf_seen=1
+      _wrf_t=$(date +%s)
+      echo "[hindcast-mpi] detected wrf: SUCCESS COMPLETE WRF"
+    fi
+  fi
+  if [[ "${_roms_seen}" -eq 1 ]]; then
+    _now=$(date +%s)
+    _since_roms=$((_now - _roms_t))
+    # Both markers: brief grace then stop (avoid MPI finalize / stdout hang).
+    if [[ "${_wrf_seen}" -eq 1 ]]; then
+      _since_wrf=$((_now - _wrf_t))
+      if [[ "${_since_wrf}" -ge "${_grace_after_roms}" ]]; then
+        echo "[hindcast-mpi] model success (ROMS+WRF); force-stopping MPI after ${_grace_after_roms}s grace"
+        _iht_kill_mpi_tree "${_mpi_pid}"
+        _forced_done=1
+        break
+      fi
+    elif [[ "${_since_roms}" -ge "${_wrf_wait_sec}" ]]; then
+      echo "[hindcast-mpi] ROMS DONE but WRF SUCCESS not seen within ${_wrf_wait_sec}s; force-stopping MPI"
+      _iht_kill_mpi_tree "${_mpi_pid}"
+      _forced_done=1
+      break
+    fi
+  fi
+  sleep "${_poll_sec}"
+done
+
+wait "${_mpi_pid}"
 _rc=$?
 set -e
-unset _NP _PPN
+if [[ "${_forced_done}" -eq 1 ]]; then
+  echo "[hindcast-mpi] watchdog ended job after model completion (mpiexec wait rc=${_rc} → treating as success)"
+  _rc=0
+elif [[ "${_rc}" -ne 0 ]]; then
+  echo "[hindcast-mpi] mpiexec exited rc=${_rc} (no forced DONE stop)"
+fi
+unset _NP _PPN _mpi_pid _forced_done _roms_seen _wrf_seen _log _grace_after_roms _poll_sec _wrf_wait_sec
+unset -f _iht_kill_mpi_tree 2>/dev/null || true
 
 date
 
