@@ -60,7 +60,7 @@ source $HOME/inacawo-iht/setup_env.bash
 ```
 postprocess/
   run_postprocess.bash    # entrypoint
-  tutorials/              # Jupyter consumer + walkthrough notebook
+  tutorials/              # Jupyter user + walkthrough notebook
   post_roms2d/            # ocean2d regrid + SLURM
   post_roms3d/            # ocean3d regrid + SLURM
   post_wrf2d/             # wrf2d regrid + SLURM
