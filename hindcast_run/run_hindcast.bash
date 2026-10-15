@@ -59,6 +59,8 @@ Logs (default, under iht repo):
 
 Prerequisites:
   preprocess products under $CAWO_INPUT; COAWST binaries under $MODEL_BASE.
+  Each day D runs D 12Z → D+1 12Z, so ROMS needs ocnG for D and D+1.
+  Use the same --end as run_preprocess (default pads end+1 automatically).
 EOF
 }
 
@@ -369,6 +371,39 @@ _with_iht_dates() {
   )
 }
 
+# Each hindcast day D runs D 12Z → D+1 12Z; roms.in lists CLM/BRY for D and D+1.
+_iht_check_roms_forcing() {
+  local base="${ROMS_FORCING:-}"
+  if [[ -z "${base}" ]]; then
+    echo "ERROR: ROMS_FORCING unset (source setup_env.bash)" >&2
+    return 1
+  fi
+  local d next f path missing=0 need_end
+  d="${START}"
+  while [[ "${d}" -le "${END}" ]]; do
+    next="$(date -d "${d} + 1 day" +%Y%m%d)"
+    for day in "${d}" "${next}"; do
+      for f in ocean_clm.nc ocean_bry.nc; do
+        path="${base}/f${day}/ocnG/${f}"
+        if [[ ! -f "${path}" ]]; then
+          echo "ERROR: missing ROMS forcing: ${path}" >&2
+          missing=1
+        fi
+      done
+    done
+    d="${next}"
+  done
+  if [[ "${missing}" -ne 0 ]]; then
+    need_end="$(date -d "${END} + 1 day" +%Y%m%d)"
+    echo "ERROR: hindcast day needs today+tomorrow ocnG (12Z→12Z)." >&2
+    echo "       Run: ./run_preprocess.bash --start ${START} --end ${END} --stage roms" >&2
+    echo "       (preprocess auto-prepares through ${need_end}; or --exact-dates for a single day)" >&2
+    return 1
+  fi
+  echo "[hindcast] ROMS forcing OK for ${START}..${END} (including end+1 ocnG)"
+  return 0
+}
+
 _run_step() {
   local step="$1"
   case "${step}" in
@@ -405,6 +440,7 @@ _run_step() {
         echo "[hindcast] (dry-run) skip"
         return 0
       fi
+      _iht_check_roms_forcing || return 1
       _SBATCH_JOBS_FILE="$(mktemp "${TMPDIR:-/tmp}/iht_hindcast_jobs.XXXXXX")"
       export IHT_SBATCH_JOBS_FILE="${_SBATCH_JOBS_FILE}"
       # Full range for submit (day1 + continuing already staged)

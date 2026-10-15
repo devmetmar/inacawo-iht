@@ -7,11 +7,14 @@ and submit the 3-way model.
 
 ```bash
 source $HOME/inacawo-iht/setup_env.bash
-# preprocess complete: WPS, SWAN BCs, ROMS forcing under $CAWO_INPUT
+# preprocess with the SAME --end (auto-pads end+1 for 12Z→12Z forcing):
+#   ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
 # coawstM: $MODEL_BASE/binaries/{ramp_tides,no_ramp_tides}/ (from inacawo-src)
 ```
 
 Scratch run root: **`$CAWO_HINDCAST_RUN`** (`$CAWO_HINDCAST_BASE/cawo_hindcast_run`).
+Before `submit`, the entrypoint checks `$ROMS_FORCING/f*/ocnG/ocean_{clm,bry}.nc`
+for each day **and** day+1.
 
 ## Entrypoint (preferred)
 

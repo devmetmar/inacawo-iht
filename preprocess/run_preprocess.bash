@@ -34,7 +34,9 @@ Usage: run_preprocess.bash --start YYYYMMDD --end YYYYMMDD [options]
 
 Required:
   --start YYYYMMDD          Start date (inclusive)
-  --end YYYYMMDD            End date (inclusive)
+  --end YYYYMMDD            End date = last hindcast day label (inclusive).
+                            By default also prepares end+1 (12Z→12Z window
+                            needs tomorrow's forcing). See --exact-dates.
 
 Stage selection:
   --stage LIST              Comma-separated aliases and/or atomic steps (default: all)
@@ -57,7 +59,10 @@ Options:
   --day1                    ROMS: first day of --start..--end uses day1 scripts;
                             remaining days use continuing (*_par) scripts
                             (same split as run_hindcast --day1). If start==end,
-                            only that day is day1.
+                            only that day is day1. Continuing slice includes
+                            the auto end+1 day when padding is on.
+  --exact-dates             Do not extend --end by +1 day. Use when repairing a
+                            single calendar day (e.g. only the padding day).
   --glorys-product NAME     reanalysis (default) | interim
   --overwrite               Re-download even if outputs already exist and validate
   --dry-run                 Print commands only
@@ -68,10 +73,15 @@ Options:
   -v, --verbose             Also mirror log to this terminal (default: quiet)
   -h, --help                Show this help
 
+Date semantics (aligned with run_hindcast):
+  Each hindcast day D runs D 12Z → D+1 12Z, so ROMS/SWAN/WPS need products for
+  D and D+1. Default: effective range is --start..(--end + 1 day). Same --end
+  as run_hindcast is enough; no manual +1. Pass --exact-dates to disable.
+
 Download behaviour:
-  Default: skip a download step when all expected outputs for --start..--end
-  already exist and validate (NetCDF via ncdump -h; GRIB via wgrib2/grib_ls
-  or GRIB magic bytes). Pass --overwrite to force re-download.
+  Default: skip a download step when all expected outputs for the effective
+  --start..--end already exist and validate (NetCDF via ncdump -h; GRIB via
+  wgrib2/grib_ls or GRIB magic bytes). Pass --overwrite to force re-download.
 
 SLURM behaviour (wps / swan / roms):
   Per-day Slurm arrays for ungrib/metgrid/real/swan/roms-gcawo (days are
@@ -100,6 +110,7 @@ END=""
 STAGE="all"
 MODEL=""
 DAY1=0
+EXACT_DATES=0
 GLORYS_PRODUCT="reanalysis"
 OVERWRITE=0
 DRY_RUN=0
@@ -115,6 +126,7 @@ while [[ $# -gt 0 ]]; do
     --stage) STAGE="${2:-}"; shift 2 ;;
     --model) MODEL="${2:-}"; shift 2 ;;
     --day1) DAY1=1; shift ;;
+    --exact-dates) EXACT_DATES=1; shift ;;
     --glorys-product) GLORYS_PRODUCT="${2:-}"; shift 2 ;;
     --overwrite) OVERWRITE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -296,21 +308,28 @@ _iht_set_dates() {
   _ARRAY_MAX=$((_DAYS - 1))
 }
 
+# Requested CLI end (before optional hindcast end+1 pad).
+REQUESTED_END="${END}"
+
 _iht_set_dates "${START}" "${END}"
 
-# --day1 split (ROMS only; same idea as run_hindcast)
-DAY1_START=""
-DAY1_END=""
-CONT_START=""
-CONT_END=""
-if [[ "${DAY1}" -eq 1 ]]; then
-  DAY1_START="${START}"
-  DAY1_END="${START}"
-  if [[ "${START}" -lt "${END}" ]]; then
-    CONT_START="$(date -d "${START} + 1 day" +%Y%m%d)"
-    CONT_END="${END}"
+# --day1 split helper (ROMS only; same idea as run_hindcast). Call after END
+# is finalized (may include end+1 pad).
+_iht_apply_day1_split() {
+  DAY1_START=""
+  DAY1_END=""
+  CONT_START=""
+  CONT_END=""
+  if [[ "${DAY1}" -eq 1 ]]; then
+    DAY1_START="${START}"
+    DAY1_END="${START}"
+    if [[ "${START}" -lt "${END}" ]]; then
+      CONT_START="$(date -d "${START} + 1 day" +%Y%m%d)"
+      CONT_END="${END}"
+    fi
   fi
-fi
+}
+_iht_apply_day1_split
 
 # ---------------------------------------------------------------------------
 # Stage expand + model filter
@@ -396,6 +415,28 @@ if [[ "${#_STEPS[@]}" -eq 0 ]]; then
   exit 2
 fi
 
+# Hindcast day D needs products for D and D+1 (12Z→12Z). Pad --end by +1
+# unless --exact-dates (repair a single calendar day).
+_iht_steps_need_end_plus_one() {
+  local s
+  for s in "${_STEPS[@]}"; do
+    case "${s}" in
+      era5-sfc|era5-pl|era5-waves|glorys|ungrib|metgrid|real|swan|roms-a0|roms-gcawo)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+PADDED_END=0
+if [[ "${EXACT_DATES}" -eq 0 ]] && _iht_steps_need_end_plus_one; then
+  END="$(date -d "${REQUESTED_END} + 1 day" +%Y%m%d)"
+  PADDED_END=1
+  _iht_set_dates "${START}" "${END}"
+  _iht_apply_day1_split
+fi
+
 export IHT_OVERWRITE="${OVERWRITE}"
 
 # ---------------------------------------------------------------------------
@@ -407,6 +448,11 @@ source "${_IHT_ROOT}/src/slurm_partition.bash"
 _iht_resolve_slurm_partition
 
 echo "[preprocess] ${START} → ${END} (${_DAYS} day(s))"
+if [[ "${PADDED_END}" -eq 1 ]]; then
+  echo "[preprocess] hindcast window: requested --end=${REQUESTED_END} → also preparing end+1=${END} (use --exact-dates to disable)"
+elif [[ "${EXACT_DATES}" -eq 1 ]]; then
+  echo "[preprocess] exact-dates=ON (no end+1 pad)"
+fi
 echo "[preprocess] steps: ${_STEPS[*]}"
 if [[ "${DAY1}" -eq 1 ]]; then
   echo "[preprocess] ROMS --day1: day1 slice ${DAY1_START} → ${DAY1_END}"

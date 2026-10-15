@@ -23,6 +23,12 @@ Download and build all forcing needed for a hindcast day. Code lives here under
 days use continuing scripts (`*_par`). If `start==end`, only that day is day1.
 WPS/SWAN/download are unchanged by `--day1`.
 
+**`--end` = last hindcast day (auto end+1):** each coupled day runs **12Z→12Z+1**,
+so ROMS/SWAN/WPS need products for `D` and `D+1`. By default preprocess extends
+the effective range to `--end + 1 day` (same `--end` as `run_hindcast`). Log line:
+`requested --end=E → also preparing end+1=…`. Pass `--exact-dates` to disable
+(e.g. repairing only the padding day).
+
 `run_preprocess.bash` sources `setup_env.bash` itself, sets `IHT_START_DATE` /
 `IHT_END_DATE` (and ISO/dot variants), and dispatches subdirectory scripts. Dates
 are **not** edited inside SLURM files for normal use. Use `--dry-run` to print
