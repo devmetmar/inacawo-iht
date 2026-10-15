@@ -57,7 +57,9 @@ _iht_creds_cmems_status() {
     echo dummy
     return
   fi
-  # Minimal JSON shape with non-empty username/password
+  # Accept either:
+  #   - legacy JSON {"username","password"} (setup_env --cmems-* / older login)
+  #   - modern copernicusmarine login blob (non-JSON, non-empty; not a dummy)
   if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
     local py=python3
     command -v python3 >/dev/null 2>&1 || py=python
@@ -65,9 +67,18 @@ _iht_creds_cmems_status() {
 import json,sys
 p=sys.argv[1]
 try:
-    o=json.load(open(p))
+    raw=open(p).read()
 except Exception:
-    sys.exit(2)
+    sys.exit(1)
+if not raw.strip():
+    sys.exit(1)
+try:
+    o=json.loads(raw)
+except Exception:
+    # Encrypted / base64 credential file from `copernicusmarine login`
+    sys.exit(0)
+if not isinstance(o, dict):
+    sys.exit(0)
 u=str(o.get("username") or o.get("user") or "").strip()
 pw=str(o.get("password") or o.get("pass") or "").strip()
 sys.exit(0 if u and pw else 1)
@@ -78,7 +89,12 @@ sys.exit(0 if u and pw else 1)
     fi
     return
   fi
-  echo ok
+  # No python: non-empty, non-dummy file → treat as configured
+  if [[ -s "${cmems_file}" ]]; then
+    echo ok
+  else
+    echo dummy
+  fi
 }
 
 # Seed dummy credential files once (never overwrite existing).
