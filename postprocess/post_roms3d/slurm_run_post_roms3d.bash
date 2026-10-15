@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=postR3d_days
-#SBATCH --array=0-10%9      # adjust range and concurrency as needed
+#SBATCH --array=0-10%9      # overridden by run_postprocess.bash --array=
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -26,14 +26,16 @@ fi
 ########################################
 # USER INPUT
 ########################################
-START_DATE="1995-01-01"      # date corresponding to array index 0
-END_DATE="1995-01-05"        # inclusive; change as needed
+# Dates from run_postprocess.bash (IHT_*_ISO) or fallback for manual sbatch
+START_DATE="${IHT_START_DATE_ISO:-1995-01-01}"
+END_DATE="${IHT_END_DATE_ISO:-1995-01-05}"
 
 HIND_ROOT=$CAWO_OUTPUT
 OUT_ROOT="$CAWO_POST/ocean3d"
 
-# Directory where post_roms3d_xesmf.py lives
-POSTPROC_DIR="$WORK_BASE/postprocess"
+# Directory where post_roms3d_xesmf.py lives (this product dir)
+POSTPROC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "${POSTPROC_DIR}/log"
 
 # ROMS his numbers to process
 # 1 occurs only on f19950101; others (4,7,10,...) appear on all days

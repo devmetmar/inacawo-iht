@@ -103,7 +103,7 @@ source $HOME/inacawo-iht/setup_env.bash
 cd $WORK_BASE
 ```
 
-Use **`hindcast`** for all stages (download, LO forcing, postprocess). Edit date ranges inside each SLURM script before submitting.
+Use **`hindcast`** for all stages (download, LO forcing, postprocess).
 
 ### 1. Preprocess
 
@@ -135,13 +135,16 @@ range; later days use no-ramp + default templates. Quiet logs under
 
 ### 3. Postprocess
 
+Preferred entrypoint (dates via CLI; see `postprocess/README.md`):
+
 ```bash
-cd postprocess
-sbatch slurm_run_post_roms2d.bash
-sbatch slurm_run_post_roms3d.bash
-sbatch slurm_run_post_wrf2d.bash
-sbatch slurm_run_post_wrf3d.bash
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms2d
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wrf --dry-run
 ```
+
+Quiet logs under `$WORK_BASE/logs/postprocess/`. Shared archive tutorial:
+`postprocess/tutorials/tutorial_postprocessed_hindcast.ipynb`.
 
 ## LiveOcean (preprocess only)
 

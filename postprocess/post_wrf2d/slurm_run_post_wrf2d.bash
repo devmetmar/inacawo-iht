@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=post2d_days
-#SBATCH --array=0-365%9      # adjust max days and concurrency as needed
+#SBATCH --array=0-365%9      # overridden by run_postprocess.bash --array=
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -25,11 +25,16 @@ fi
 ########################################
 # USER INPUT
 ########################################
-START_DATE="1995-01-01"      # date corresponding to array index 0
-END_DATE="1995-01-05"        # inclusive; change as needed
+# Dates from run_postprocess.bash (IHT_*_ISO) or fallback for manual sbatch
+START_DATE="${IHT_START_DATE_ISO:-1995-01-01}"
+END_DATE="${IHT_END_DATE_ISO:-1995-01-05}"
 
 HIND_ROOT=$CAWO_OUTPUT
 OUT_ROOT="$CAWO_POST/wrf2d"
+
+POSTPROC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "${POSTPROC_DIR}/log"
+export PYTHONPATH="${POSTPROC_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 
 # ---- Manual flag: skip first 3-hourly file in EACH day? ----
 # 0 = do NOT skip (process all 3-hourly files for each day)
@@ -75,7 +80,7 @@ for INFILE in "${IN_DAY_DIR}"/wrfhtr_d01_*; do
     BASENAME=$(basename "$INFILE")         # wrfhtr_d01_1995-01-03_12:00:00
     TIMEPART=${BASENAME#wrfhtr_d01_}      # 1995-01-03_12:00:00
 
-    # Extract hour: YYYY-MM-DD_HH:MM:SS -> HH at pos 12�13 (0-based index 11)
+    # Extract hour: YYYY-MM-DD_HH:MM:SS -> HH at pos 12–13 (0-based index 11)
     HOUR=${TIMEPART:11:2}
 
     # Keep only 3-hourly files (00,03,06,...,21)
@@ -103,10 +108,10 @@ outfile = "${OUTFILE}"
 process_wrf2d_xesmf(infile, outfile)
 EOF
 
-    STATUS=\$?
-    if [ \$STATUS -ne 0 ]; then
-        echo "ERROR: process_wrf2d_xesmf failed for ${INFILE} with status \${STATUS}"
-        exit \$STATUS
+    STATUS=$?
+    if [ $STATUS -ne 0 ]; then
+        echo "ERROR: process_wrf2d_xesmf failed for ${INFILE} with status ${STATUS}"
+        exit $STATUS
     fi
 done
 
