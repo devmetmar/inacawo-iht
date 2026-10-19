@@ -7,26 +7,43 @@ Each calendar day runs as a separate integration (`fYYYYMMDD`).
 
 | Repo | Role |
 |------|------|
-| `$HOME/inacawo-deps` | Conda env (`hindcast.yml`) + LiveOcean code (`LO/`) |
+| `$HOME/inacawo-deps` | Conda env (`hindcast`) + COAWST libraries in `~/apps` + LiveOcean (`LO/`) |
 | `$HOME/inacawo-iht` | **This repo** — preprocess / run / postprocess scripts |
-| `$HOME/inacawo-src` | Built COAWST trees (ramp / no-ramp binaries) |
+| `$HOME/inacawo-src` | Build scripts and headers only. You compile `binaries/{ramp_tides,no_ramp_tides}/coawstM` yourself; the model source is not in git |
 
 ## One-time setup (new machine)
 
-```bash
-# 1) Clone
-git clone <inacawo-deps-url>  $HOME/inacawo-deps
-git clone <inacawo-iht-url>   $HOME/inacawo-iht
-# (+ inacawo-src as needed)
+Do these in order. Daily work starts only after step 4.
 
-# 2) Shared dirs (LO_* + CAWO_HINDCAST_BASE), Miniforge, hindcast env
+```bash
+# 1) Clone all three under $HOME
+git clone https://github.com/devmetmar/inacawo-deps.git $HOME/inacawo-deps
+git clone https://github.com/devmetmar/inacawo-src.git  $HOME/inacawo-src
+git clone https://github.com/devmetmar/inacawo-iht.git  $HOME/inacawo-iht
+
+# 2) Model libraries (~/apps), Miniforge, and the hindcast conda env
 bash $HOME/inacawo-deps/install_hindcast_env.bash
 # optional: --force-recreate for a clean rebuild
 
-# 3) API credentials — one account per user (training / multi-user)
-#    source ./setup_env.bash \
-#      --cds-key 'UID:KEY' --cmems-user U --cmems-pass P
-#    # or edit dummies / copernicusmarine login — see src/credentials/README.md
+# 3) Compile both coawstM. This uses the Intel toolchain (COAWST_ENV),
+#    not the conda env. Two jobs, 1 node x 96 cores each.
+#    IHT accounts: --partition DEV1. Omit it only if your account is allowed
+#    on HDCAST; otherwise the wrapper selects DEV1 itself.
+cd $HOME/inacawo-src
+bash build_coawst.bash --sbatch --partition DEV1
+# squeue -u $USER
+# binaries/ramp_tides/coawstM and binaries/no_ramp_tides/coawstM
+
+# 4) Activate the hindcast workflow (paths + conda activate hindcast)
+source $HOME/inacawo-iht/setup_env.bash
+```
+
+API credentials are optional on that same command (one account per user):
+
+```bash
+source $HOME/inacawo-iht/setup_env.bash \
+  --cds-key 'UID:KEY' --cmems-user U --cmems-pass P
+# or edit dummies / copernicusmarine login — see src/credentials/README.md
 # Operators only: IHT_VAULT_CREDS=1 + src/credentials/vault-token
 ```
 
@@ -42,6 +59,8 @@ source $HOME/inacawo-iht/setup_env.bash
 
 That sources `env` → `inacawo-deps/env`, then helpers under `src/` (`setup_vault.bash`,
 `setup_credentials.bash`), soft-checks credentials, and `conda activate hindcast`.
+Use this for preprocess, hindcast, and postprocess. Compiling `coawstM` does not:
+`build_coawst.bash` sources `inacawo-deps/env` and `COAWST_ENV` itself.
 
 **Credentials:** CLI args above, or personal files — see [src/credentials/README.md](src/credentials/README.md).  
 **Vault (opt-in):** `IHT_VAULT_CREDS=1` — see `src/setup_vault.bash`.
@@ -53,7 +72,7 @@ Key variables (see `inacawo-deps/env` + `env`):
 | `WORK_BASE` | `$HOME/inacawo-iht` |
 | `SCRATCH` | `/scratch/$USER` |
 | `MODEL_BASE` | `$HOME/inacawo-src` |
-| `COAWST_ENV` | `$DEPS_BASE/coawst.bash_env_intel.source_oneapi` (Intel toolchain; sourced only by WPS/run) |
+| `COAWST_ENV` | `$DEPS_BASE/coawst.bash_env_intel.source_oneapi` (Intel toolchain; sourced by `build_coawst.bash`, WPS, and the model run — not by `conda activate`) |
 | `CAWO_HINDCAST_BASE` | `$SCRATCH/inacawo-iht` |
 | `LO` / `LO_USER` | deps code / `preprocess/LO_user` |
 | `LO_DATA` / `LO_OUTPUT` | `$SCRATCH/inacawo-iht/cawo_input/LO_{data,output}` |
@@ -104,6 +123,13 @@ cd $WORK_BASE
 ```
 
 Use **`hindcast`** for all stages (download, LO forcing, postprocess).
+
+**Slurm partition:** IHT accounts use `--partition DEV1` (or
+`IHT_SLURM_PARTITION=DEV1`). Preprocess, hindcast, postprocess, and
+`build_coawst.bash` select `HDCAST` only when the Slurm account is in that
+partition’s `AllowAccounts`; otherwise they select `DEV1` (so jobs do not sit
+in `PENDING (PartitionConfig)`). Omit `--partition` only if your account is
+allowed on `HDCAST`.
 
 ### 1. Preprocess
 
