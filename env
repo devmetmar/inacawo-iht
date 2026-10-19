@@ -35,6 +35,9 @@ export WRF_STATIC_DIR="${WRF_STATIC_DIR:-${WRF_DIR}/wrf-4.3.1_static}"
 export WRF_STATIC_EXTRA_DIR="${WRF_STATIC_EXTRA_DIR:-${WRF_DIR}/extra_static}"
 export GEOGRID_FILE="${GEOGRID_FILE:-${SHARED_DATA}/wps_run/geogrid_v43/geo_em.d01.nc.ID03F3}"
 export GRID_DATA="${GRID_DATA:-${SHARED_DATA}/grids}"
+# Shared forcing archive for run_preprocess --offline (group-writable on this HPC).
+# Layout matches $CAWO_INPUT: era5/, era5_waves/, mercator/ (TC Seroja training case).
+export IHT_OFFLINE_INPUT="${IHT_OFFLINE_INPUT:-/scratch/cawohdcst_ft2/data}"
 # Per-user writable under cawo_input/
 export ERA5_BASE_DIR="${CAWO_INPUT}/era5"
 export GLORYS_BASE_DIR="${CAWO_INPUT}/mercator"

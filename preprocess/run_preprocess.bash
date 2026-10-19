@@ -8,6 +8,7 @@
 #   ./run_preprocess.bash --start 19950101 --end 19950105
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage download
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage download --model era5-pl
+#   ./run_preprocess.bash --start 20210404 --end 20210410 --stage download --offline
 #   ./run_preprocess.bash --start 20251231 --end 20260105 --stage roms --day1
 #     → ROMS day1 for 20251231, then *_par for 20260101..20260105
 #   ./run_preprocess.bash --start 19950101 --end 19950105 --stage wps --dry-run
@@ -65,6 +66,15 @@ Options:
                             single calendar day (e.g. only the padding day).
   --glorys-product NAME     reanalysis (default) | interim
   --overwrite               Re-download even if outputs already exist and validate
+                            (incompatible with --offline)
+  --offline                 Download steps only: symlink from shared offline root
+                            into $CAWO_INPUT; never call CDS/CMEMS. Fail if the
+                            shared tree is incomplete. Cap: ≤7 requested
+                            hindcast days (TC Seroja training window).
+  --offline-root DIR        Offline source tree (default:
+                            $IHT_OFFLINE_INPUT, usually
+                            /scratch/cawohdcst_ft2/data). Expects
+                            era5/, era5_waves/, mercator/ like $CAWO_INPUT.
   --dry-run                 Print commands only
   --wait                    Wait for SLURM jobs (default)
   --no-wait                 Submit SLURM jobs and exit (WPS chained via aftercorr)
@@ -82,6 +92,8 @@ Download behaviour:
   Default: skip a download step when all expected outputs for the effective
   --start..--end already exist and validate (NetCDF via ncdump -h; GRIB via
   wgrib2/grib_ls or GRIB magic bytes). Pass --overwrite to force re-download.
+  --offline: link from --offline-root (no network); training case is TC Seroja
+  --start 20210404 --end 20210410 (end+1 → products through 20210411).
 
 SLURM behaviour (wps / swan / roms):
   Per-day Slurm arrays for ungrib/metgrid/real/swan/roms-gcawo (days are
@@ -99,6 +111,7 @@ Semantics:
   --stage download                  all downloads
   --stage download --model era5-pl  only pressure-level ERA5
   --stage era5-pl                   same as above
+  --stage download --offline        symlink shared Seroja/offline archive
 EOF
 }
 
@@ -113,6 +126,8 @@ DAY1=0
 EXACT_DATES=0
 GLORYS_PRODUCT="reanalysis"
 OVERWRITE=0
+OFFLINE=0
+OFFLINE_ROOT=""
 DRY_RUN=0
 WAIT_JOBS=1
 PARTITION_ARG=""
@@ -129,6 +144,8 @@ while [[ $# -gt 0 ]]; do
     --exact-dates) EXACT_DATES=1; shift ;;
     --glorys-product) GLORYS_PRODUCT="${2:-}"; shift 2 ;;
     --overwrite) OVERWRITE=1; shift ;;
+    --offline) OFFLINE=1; shift ;;
+    --offline-root) OFFLINE_ROOT="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --wait) WAIT_JOBS=1; shift ;;
     --no-wait) WAIT_JOBS=0; shift ;;
@@ -177,7 +194,16 @@ if [[ "${DRY_RUN}" -eq 0 ]]; then
   source "${_IHT_ROOT}/setup_env.bash"
 else
   export WORK_BASE="${WORK_BASE:-${_IHT_ROOT}}"
+  # dry-run may not source setup_env; keep offline-root resolvable
+  export IHT_OFFLINE_INPUT="${IHT_OFFLINE_INPUT:-/scratch/cawohdcst_ft2/data}"
 fi
+
+# Offline source tree (resolved after env so IHT_OFFLINE_INPUT is available)
+if [[ -z "${OFFLINE_ROOT}" ]]; then
+  OFFLINE_ROOT="${IHT_OFFLINE_INPUT:-/scratch/cawohdcst_ft2/data}"
+fi
+export IHT_OFFLINE="${OFFLINE}"
+export IHT_OFFLINE_INPUT="${OFFLINE_ROOT}"
 
 # ---------------------------------------------------------------------------
 # Auto-log → $WORK_BASE/logs/preprocess/ (portable under iht repo)
@@ -415,6 +441,37 @@ if [[ "${#_STEPS[@]}" -eq 0 ]]; then
   exit 2
 fi
 
+# Offline guards (download steps only): no overwrite, ≤7 requested hindcast days
+_iht_plan_has_download_step() {
+  local s
+  for s in "${_STEPS[@]}"; do
+    case "${s}" in
+      era5-sfc|era5-pl|era5-waves|glorys) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+if [[ "${OFFLINE}" -eq 1 ]] && _iht_plan_has_download_step; then
+  if [[ "${OVERWRITE}" -eq 1 ]]; then
+    echo "ERROR: --offline cannot be combined with --overwrite (offline never re-fetches)" >&2
+    exit 2
+  fi
+  _REQ_DAYS=$(( ( $(date -d "${REQUESTED_END}" +%s) - $(date -d "${START}" +%s) ) / 86400 + 1 ))
+  if [[ "${_REQ_DAYS}" -gt 7 ]]; then
+    echo "ERROR: --offline allows at most 7 requested hindcast days (got ${_REQ_DAYS}:" \
+      "${START} → ${REQUESTED_END})" >&2
+    echo "       TC Seroja training window: --start 20210404 --end 20210410" >&2
+    exit 2
+  fi
+  if [[ ! -d "${OFFLINE_ROOT}" ]]; then
+    echo "ERROR: --offline root does not exist: ${OFFLINE_ROOT}" >&2
+    echo "       Set --offline-root or IHT_OFFLINE_INPUT" \
+      "(default /scratch/cawohdcst_ft2/data)" >&2
+    exit 2
+  fi
+fi
+
 # Hindcast day D needs products for D and D+1 (12Z→12Z). Pad --end by +1
 # unless --exact-dates (repair a single calendar day).
 _iht_steps_need_end_plus_one() {
@@ -470,6 +527,11 @@ if [[ "${OVERWRITE}" -eq 1 ]]; then
   echo "[preprocess] overwrite=ON (force re-download)"
 else
   echo "[preprocess] overwrite=OFF (skip valid existing download outputs)"
+fi
+if [[ "${OFFLINE}" -eq 1 ]]; then
+  echo "[preprocess] offline=ON (symlink from ${OFFLINE_ROOT}; no CDS/CMEMS)"
+else
+  echo "[preprocess] offline=OFF"
 fi
 _iht_log_slurm_partition "[preprocess]"
 
@@ -586,6 +648,110 @@ _iht_is_download_step() {
     era5-sfc|era5-pl|era5-waves|glorys) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# Symlink src → dest (dir or file). Leave an existing real dest alone
+# (validation decides if it is usable). Replace a wrong symlink.
+_iht_offline_ensure_link() {
+  local src="$1" dest="$2"
+  local src_r dest_r
+  if [[ ! -e "${src}" && ! -L "${src}" ]]; then
+    echo "ERROR: offline source missing: ${src}" >&2
+    return 1
+  fi
+  if [[ -L "${dest}" ]]; then
+    src_r="$(readlink -f "${src}" 2>/dev/null || true)"
+    dest_r="$(readlink -f "${dest}" 2>/dev/null || true)"
+    if [[ -n "${src_r}" && -n "${dest_r}" && "${src_r}" == "${dest_r}" ]]; then
+      return 0
+    fi
+  elif [[ -e "${dest}" ]]; then
+    # Existing real file/dir under $CAWO_INPUT — keep; caller validates.
+    return 0
+  fi
+  mkdir -p "$(dirname "${dest}")"
+  ln -sfn "${src}" "${dest}"
+  echo "[offline] linked ${dest} → ${src}" >&2
+  return 0
+}
+
+# Link shared offline tree into $CAWO_INPUT for one download step.
+# Never calls CDS/CMEMS. Returns 0 only if outputs validate afterward.
+_iht_offline_link_download_step() {
+  local step="$1"
+  local cawo="${CAWO_INPUT:-}"
+  local root="${IHT_OFFLINE_INPUT:-${OFFLINE_ROOT:-}}"
+  local d iso src dest gdir_src gdir_dst missing=0
+  local cawo_r root_r
+
+  if [[ -z "${cawo}" ]]; then
+    echo "ERROR: CAWO_INPUT is unset; cannot offline-link ${step}" >&2
+    return 1
+  fi
+  if [[ -z "${root}" || ! -d "${root}" ]]; then
+    echo "ERROR: offline root missing or not a directory: ${root:-<empty>}" >&2
+    return 1
+  fi
+
+  cawo_r="$(readlink -f "${cawo}" 2>/dev/null || echo "${cawo}")"
+  root_r="$(readlink -f "${root}" 2>/dev/null || echo "${root}")"
+  if [[ "${cawo_r}" == "${root_r}" ]]; then
+    echo "[offline] CAWO_INPUT is the offline root; validating in place" >&2
+    if _iht_download_outputs_valid "${step}"; then
+      return 0
+    fi
+    echo "ERROR: offline in-place validation failed for ${step} under ${cawo}" >&2
+    return 1
+  fi
+
+  case "${step}" in
+    era5-sfc|era5-pl)
+      while read -r d; do
+        src="${root}/era5/era5_${d}"
+        dest="${cawo}/era5/era5_${d}"
+        if ! _iht_offline_ensure_link "${src}" "${dest}"; then
+          missing=1
+        fi
+      done < <(_iht_each_day)
+      ;;
+    era5-waves)
+      while read -r d; do
+        src="${root}/era5_waves/era5_${d}"
+        dest="${cawo}/era5_waves/era5_${d}"
+        if ! _iht_offline_ensure_link "${src}" "${dest}"; then
+          missing=1
+        fi
+      done < <(_iht_each_day)
+      ;;
+    glorys)
+      gdir_src="${root}/mercator"
+      gdir_dst="${cawo}/mercator"
+      mkdir -p "${gdir_dst}"
+      while read -r d; do
+        iso="$(date -d "${d:0:4}-${d:4:2}-${d:6:2}" +%Y-%m-%d)"
+        src="${gdir_src}/GLORYS_Reanalysis_LO_${iso}T00:00:00.nc"
+        dest="${gdir_dst}/GLORYS_Reanalysis_LO_${iso}T00:00:00.nc"
+        if ! _iht_offline_ensure_link "${src}" "${dest}"; then
+          missing=1
+        fi
+      done < <(_iht_each_day)
+      ;;
+    *)
+      echo "ERROR: not a download step: ${step}" >&2
+      return 1
+      ;;
+  esac
+
+  if [[ "${missing}" -ne 0 ]]; then
+    echo "ERROR: offline link incomplete for ${step} (root=${root})" >&2
+    return 1
+  fi
+  if ! _iht_download_outputs_valid "${step}"; then
+    echo "ERROR: offline outputs invalid after linking ${step}" >&2
+    echo "       expected under ${cawo}; source ${root}" >&2
+    return 1
+  fi
+  return 0
 }
 
 _iht_record_time() {
@@ -974,6 +1140,27 @@ _run_step() {
         _skip_local "${dlabel}"
         return 0
       fi
+    fi
+    # --offline: symlink from shared root; never call CDS/CMEMS
+    if [[ "${OFFLINE}" -eq 1 ]]; then
+      local t0_off t1_off elapsed_off
+      echo "[run] ${dlabel} (offline link from ${IHT_OFFLINE_INPUT})" >&2
+      if [[ "${DRY_RUN}" -eq 1 ]]; then
+        echo "      ln -sfn ${IHT_OFFLINE_INPUT}/… → \${CAWO_INPUT}/…" >&2
+        _iht_record_time "${dlabel} (offline)" 0 "dry-run"
+        return 0
+      fi
+      t0_off="$(date +%s)"
+      if _iht_offline_link_download_step "${step}"; then
+        t1_off="$(date +%s)"
+        elapsed_off=$((t1_off - t0_off))
+        _iht_record_time "${dlabel} (offline)" "${elapsed_off}" "ok"
+        return 0
+      fi
+      t1_off="$(date +%s)"
+      elapsed_off=$((t1_off - t0_off))
+      _iht_record_time "${dlabel} (offline)" "${elapsed_off}" "FAIL"
+      exit 1
     fi
   fi
 

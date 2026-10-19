@@ -23,7 +23,7 @@ git clone https://github.com/devmetmar/inacawo-iht.git  $HOME/inacawo-iht
 
 # 2) Libraries in ~/apps (~37 GiB), Miniforge, and the hindcast conda env.
 #    --offline still installs the COAWST libraries; only the conda env is shared.
-bash $HOME/inacawo-deps/install_hindcast_env.bash             # online: private env
+# bash $HOME/inacawo-deps/install_hindcast_env.bash             # online: private env
 # or, on a flaky network (shared read-only env, no downloads):
 bash $HOME/inacawo-deps/install_hindcast_env.bash --offline
 # private env only: --force-recreate
@@ -85,7 +85,7 @@ Key variables (see `inacawo-deps/env` + `env`):
 | `ROMS_FORCING` | `$CAWO_INPUT/roms_forcing` (per-user writable) |
 | `ERA5_BASE_DIR`, `GLORYS_BASE_DIR`, `WPS_RUN_DIR` | under `$CAWO_INPUT` |
 
-Shared site inputs default to **`/scratch/cawohdcst_ft/data`** (`SHARED_DATA` — also mirrored under `cawohdcst`). Override if needed:
+Shared site inputs default to `/scratch/cawohdcst_ft/data` (`SHARED_DATA` — also mirrored under `cawohdcst`). Override if needed:
 
 ```bash
 export SHARED_DATA=/scratch/cawohdcst_ft/data   # default
@@ -103,6 +103,7 @@ export SWAN_STATIC=/path/to/swan_static_cycle
 | `GEOGRID_FILE` | `wps_run/geogrid_v43/geo_em.d01.nc.ID03F3` |
 | `GRID_DATA` | `grids` |
 | `SWAN_STATIC` / `VARINFO` / `GRID_SCRIP` | `cawo_hindcast_run/...` |
+
 ## Directory layout
 
 ```
@@ -110,7 +111,12 @@ inacawo-iht/
   setup_env.bash          # source this first
   env                     # iht workflow paths (sources inacawo-deps/env)
   preprocess/             # see preprocess/README.md
-    get_era5/ get_glorys/ wps_run/ get_swan_bry/ get_roms_icbc/ LO_user/
+    get_era5/ 
+    get_glorys/ 
+    wps_run/ 
+    get_swan_bry/ 
+    get_roms_icbc/ 
+    LO_user/
   hindcast_run/           # see hindcast_run/README.md
   postprocess/            # see postprocess/README.md
   README.md
@@ -127,7 +133,7 @@ source $HOME/inacawo-iht/setup_env.bash
 cd $WORK_BASE
 ```
 
-Use **`hindcast`** for all stages (download, LO forcing, postprocess).
+Use `hindcast` for all stages (download, LO forcing, postprocess).
 
 **Slurm partition:** IHT accounts use `--partition DEV1` (or
 `IHT_SLURM_PARTITION=DEV1`). Preprocess, hindcast, postprocess, and
@@ -142,9 +148,15 @@ Preferred entrypoint (dates via CLI; see `preprocess/README.md`):
 
 ```bash
 cd preprocess
-./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD
-./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
+
+# Download dataset
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download
+# TC Seroja (shared archive, no CDS/CMEMS): ≤7 days
+./run_preprocess.bash --start 20210404 --end 20210410 --stage download --offline
+
+# Preprocessing
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
+./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage swan
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms --day1
 ```
 
@@ -156,8 +168,8 @@ Preferred entrypoint (dates via CLI; see `hindcast_run/README.md`):
 
 ```bash
 ./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --day1
-./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --stage setup
-./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD --stage submit
+# or for consecutive day without ramp tide
+./run_hindcast.bash --start YYYYMMDD --end YYYYMMDD
 ```
 
 `--day1` applies day1 templates + ramp binary to the **first** day of the
@@ -169,9 +181,10 @@ range; later days use no-ramp + default templates. Quiet logs under
 Preferred entrypoint (dates via CLI; see `postprocess/README.md`):
 
 ```bash
-./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD
 ./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms2d
-./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wrf --dry-run
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms3d
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wrf2d
+./run_postprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wrf3d
 ```
 
 Quiet logs under `$WORK_BASE/logs/postprocess/`. Shared archive tutorial:

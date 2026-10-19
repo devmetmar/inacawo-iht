@@ -11,6 +11,7 @@ Download and build all forcing needed for a hindcast day. Code lives here under
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --model era5-pl
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage download --overwrite
+./run_preprocess.bash --start 20210404 --end 20210410 --stage download --offline
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage wps
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage swan
 ./run_preprocess.bash --start YYYYMMDD --end YYYYMMDD --stage roms
@@ -48,6 +49,36 @@ uses `afterok` dependencies).
 exist and validate (NetCDF via `ncdump -h`; GRIB via `wgrib2`/`grib_ls` or GRIB
 magic bytes), that step is skipped. Pass `--overwrite` to force re-download.
 Each step logs elapsed time; a timing summary (per-step + TOTAL) is printed at the end.
+
+### Offline / shared forcing (TC Seroja)
+
+For training on this HPC, avoid CDS/CMEMS bandwidth: use `--offline` so download
+steps **symlink** from the shared tree into per-user `$CAWO_INPUT` and **never**
+call the network. Missing shared files fail hard (no download fallback).
+
+**Training window (≤7 hindcast days):** `--start 20210404 --end 20210410`.
+With default end+1, products through `20210411` are linked. Incompatible with
+`--overwrite`. Optional `--offline-root DIR` (default `$IHT_OFFLINE_INPUT` =
+`/scratch/cawohdcst_ft2/data`); expects `era5/`, `era5_waves/`, `mercator/`
+with the same layout as `$CAWO_INPUT`. Static grids/WPS remain under
+`$SHARED_DATA` (`/scratch/cawohdcst_ft/data`).
+
+```bash
+source $HOME/inacawo-iht/setup_env.bash
+./run_preprocess.bash --start 20210404 --end 20210410 --stage download --offline
+```
+
+**Maintainer staging (one-time, online):** write the Seroja archive into the
+shared forcing tree once (credentials required), then make it group-readable.
+Set `CAWO_INPUT` **before** sourcing the env (or before `run_preprocess`, which
+re-sources it):
+
+```bash
+export CAWO_INPUT=/scratch/cawohdcst_ft2/data
+source $HOME/inacawo-iht/setup_env.bash
+./run_preprocess.bash --start 20210404 --end 20210410 --stage download
+chmod -R a+rX $CAWO_INPUT/{era5/era5_2021040{4,5,6,7,8,9},era5/era5_2021041{0,1},era5_waves/era5_202104*,mercator/GLORYS*2021-04*}
+```
 
 **Auto-log (quiet):** full stdout/stderr go to
 `$WORK_BASE/logs/preprocess/preprocess_<start>_<end>_<stage>_<timestamp>.log`.
