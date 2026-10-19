@@ -111,13 +111,22 @@ source "${CONDA_BASE}/etc/profile.d/conda.sh"
 # Offline users typically point at HINDCAST_SHARED_ENV on scratch (no private copy).
 export CONDA_ENVS_DIRS="${CONDA_ENVS_DIRS:-${CONDA_BASE}/envs}"
 _HINDCAST_PREFIX="${HINDCAST_ENV_PREFIX:-${CONDA_ENVS_DIRS}/${HINDCAST_ENV_NAME:-hindcast}}"
+# Stale HINDCAST_ENV_PREFIX (e.g. local path after --offline in same shell) → shared
+if [[ ! -d "${_HINDCAST_PREFIX}/conda-meta" \
+   && -n "${HINDCAST_SHARED_ENV:-}" \
+   && -d "${HINDCAST_SHARED_ENV}/conda-meta" ]]; then
+  echo "[iht] hindcast missing at ${_HINDCAST_PREFIX}; using shared ${HINDCAST_SHARED_ENV}" >&2
+  _HINDCAST_PREFIX="${HINDCAST_SHARED_ENV}"
+  export HINDCAST_ENV_PREFIX="${_HINDCAST_PREFIX}"
+fi
 if [[ -d "${_HINDCAST_PREFIX}/conda-meta" ]]; then
   conda activate "${_HINDCAST_PREFIX}"
 else
   echo "ERROR: hindcast env not found at ${_HINDCAST_PREFIX}" >&2
   echo "       Online:  bash \$HOME/inacawo-deps/install_hindcast_env.bash" >&2
   echo "       Offline: bash \$HOME/inacawo-deps/install_hindcast_env.bash --offline" >&2
-  echo "                (uses shared env at \$HINDCAST_SHARED_ENV)" >&2
+  echo "                (uses shared env at ${HINDCAST_SHARED_ENV:-\$HINDCAST_SHARED_ENV})" >&2
+  echo "       Then: unset HINDCAST_ENV_PREFIX; source \$HOME/inacawo-iht/setup_env.bash" >&2
   return 1 2>/dev/null || exit 1
 fi
 # Ensure this user's LO tree wins for editable lo_tools (shared env is read-only)
