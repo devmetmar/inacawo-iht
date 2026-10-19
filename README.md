@@ -21,9 +21,14 @@ git clone https://github.com/devmetmar/inacawo-deps.git $HOME/inacawo-deps
 git clone https://github.com/devmetmar/inacawo-src.git  $HOME/inacawo-src
 git clone https://github.com/devmetmar/inacawo-iht.git  $HOME/inacawo-iht
 
-# 2) Model libraries (~/apps), Miniforge, and the hindcast conda env
-bash $HOME/inacawo-deps/install_hindcast_env.bash
-# optional: --force-recreate for a clean rebuild
+# 2) Libraries in ~/apps (~37 GiB), Miniforge, and the hindcast conda env.
+#    --offline still installs the COAWST libraries; only the conda env is shared.
+bash $HOME/inacawo-deps/install_hindcast_env.bash             # online: private env
+# or, on a flaky network (shared read-only env, no downloads):
+bash $HOME/inacawo-deps/install_hindcast_env.bash --offline
+# private env only: --force-recreate
+# other installer flags: inacawo-deps/README.md
+# compile flags (--variant, --time, --force-extract): inacawo-src/README.md
 
 # 3) Compile both coawstM. This uses the Intel toolchain (COAWST_ENV),
 #    not the conda env. Two jobs, 1 node x 96 cores each.
