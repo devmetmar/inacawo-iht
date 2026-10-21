@@ -179,8 +179,50 @@ echo "waiting for connection file: ${CONN_FILE}"
 for _ in $(seq 1 90); do
   if [[ -f "${CONN_FILE}" ]]; then
     echo
-    echo "=== Jupyter ready on compute ==="
+    echo "=== connection file written (waiting for Jupyter listen) ==="
     python -c "import json; print(json.dumps(json.load(open('${CONN_FILE}')), indent=2))"
+
+    # Conn JSON is written BEFORE jupyter lab binds. Wait for compute:port first,
+    # otherwise the login proxy hits ConnectionRefused and used to crash.
+    echo "[jupyter] waiting for compute Jupyter TCP ..."
+    if ! python - "${CONN_FILE}" "${JOB_ID}" <<'WAIT_COMPUTE'
+import json, socket, sys, time, subprocess
+
+d = json.load(open(sys.argv[1]))
+job_id = sys.argv[2]
+host, port = d["host"], int(d["port"])
+ok = False
+for _ in range(120):  # ~60s
+    # bail if Slurm job vanished
+    try:
+        out = subprocess.check_output(
+            ["squeue", "-h", "-j", job_id, "-o", "%T"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        out = ""
+    if not out:
+        raise SystemExit(f"job {job_id} ended before Jupyter listened on {host}:{port}")
+    s = socket.socket()
+    s.settimeout(1)
+    try:
+        s.connect((host, port))
+        ok = True
+        break
+    except OSError:
+        time.sleep(0.5)
+    finally:
+        s.close()
+if not ok:
+    raise SystemExit(f"timed out waiting for {host}:{port}")
+print(f"compute_ok {host}:{port}")
+WAIT_COMPUTE
+    then
+      echo "ERROR: Jupyter never listened on compute; see ${LOG_OUT}" >&2
+      tail -n 100 "${LOG_OUT}" 2>/dev/null || true
+      exit 1
+    fi
 
     # Stop previous login proxy (if any)
     if [[ -f "${PROXY_PID_FILE}" ]]; then
@@ -201,12 +243,11 @@ for _ in $(seq 1 90); do
     # Wait until localhost accepts the token (same path Cursor will use)
     if ! python - "${CONN_FILE}" <<'WAIT'
 import json, sys, time, urllib.request
-from pathlib import Path
 
 d = json.load(open(sys.argv[1]))
 url = f"http://127.0.0.1:{d['port']}/api/sessions?token={d['token']}"
 ok = False
-for _ in range(40):
+for _ in range(80):  # ~20s
     try:
         with urllib.request.urlopen(url, timeout=2) as r:
             if r.status == 200:
@@ -223,6 +264,10 @@ WAIT
       tail -n 40 "${PROXY_LOG}" 2>/dev/null || true
       exit 1
     fi
+
+    echo
+    echo "=== Jupyter ready on compute ==="
+    python -c "import json; print(json.dumps(json.load(open('${CONN_FILE}')), indent=2))"
 
     # Enrich connection JSON for the user
     python - "${CONN_FILE}" "${LOGIN_HOST}" "${USER}" <<'ENRICH'

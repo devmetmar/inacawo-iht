@@ -12,6 +12,7 @@ import os
 import select
 import socket
 import threading
+import time
 from pathlib import Path
 
 
@@ -32,6 +33,19 @@ def pipe(a: socket.socket, b: socket.socket) -> None:
                 s.close()
             except Exception:
                 pass
+
+
+def connect_upstream(remote: tuple[str, int], attempts: int = 20) -> socket.socket:
+    """Retry briefly — Jupyter may still be binding when the first client hits us."""
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            return socket.create_connection(remote, timeout=2)
+        except OSError as e:
+            last = e
+            time.sleep(0.25)
+    assert last is not None
+    raise last
 
 
 def main() -> int:
@@ -62,7 +76,16 @@ def main() -> int:
 
     while True:
         client, _ = srv.accept()
-        upstream = socket.create_connection(remote)
+        try:
+            upstream = connect_upstream(remote)
+        except OSError as e:
+            # Keep proxy alive; client will see connection close and can retry.
+            print(f"upstream {remote[0]}:{remote[1]} not ready: {e}", flush=True)
+            try:
+                client.close()
+            except Exception:
+                pass
+            continue
         threading.Thread(target=pipe, args=(client, upstream), daemon=True).start()
 
 
