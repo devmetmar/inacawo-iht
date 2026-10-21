@@ -33,3 +33,9 @@ log.txt
 # NFS stale file handles
 .nfs*
 **/.nfs*
+
+# Local scratch / editor artefacts
+/TODO
+/cache/
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
